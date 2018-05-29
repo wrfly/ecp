@@ -1,3 +1,5 @@
+// ecp is a package to convert environments to configurations
+// you need to do nothing but import this packet and then, Parse it
 package ecp
 
 import (
