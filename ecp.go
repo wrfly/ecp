@@ -22,31 +22,47 @@ func convertV(conf interface{}) reflect.Value {
 	return confV
 }
 
-func getEnvName(confT reflect.Type, confV reflect.Value, i int, prefix ...string) (reflect.Value, string, string) {
+func getEnvName(confT reflect.Type, confV reflect.Value, i int,
+	prefix ...string) (reflect.Value, string, string, string) {
 	field := confV.Field(i)
 	sName := confT.Field(i).Name
-	if y := confT.Field(i).Tag.Get("yaml"); y != "" {
+	tag := confT.Field(i).Tag
+
+	if y := tag.Get("yaml"); y != "" {
 		sName = y
 	}
-	return field, sName, strings.ToUpper(strings.Join(append(prefix, sName), "_"))
+
+	envName := strings.ToUpper(strings.Join(append(prefix, sName), "_"))
+	if e := tag.Get("env"); e != "" {
+		envName = e
+	}
+
+	return field, sName, envName, tag.Get("default")
 
 }
 
-func Parse(conf interface{}, prefix ...string) error {
+func rangeOver(conf interface{}, parseDefault bool, prefix ...string) error {
 	confV := convertV(conf)
 	confT := confV.Type()
 	for i := 0; i < confV.NumField(); i++ {
-		field, sName, envName := getEnvName(confT, confV, i, prefix...)
+		field, sName, envName, d := getEnvName(confT, confV, i, prefix...)
 		if debug {
 			fmt.Printf("got env config %s\n", envName)
 		}
+
 		v := os.Getenv(envName)
+		if parseDefault {
+			v = d
+		}
+
 		if v == "" && field.Kind() != reflect.Struct {
 			continue
 		}
+
 		if debug {
 			fmt.Printf("set %s to %s\n", envName, v)
 		}
+
 		switch field.Kind() {
 		case reflect.String:
 			field.SetString(v)
@@ -71,7 +87,7 @@ func Parse(conf interface{}, prefix ...string) error {
 			}
 			field.SetInt(int64(vint))
 		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-			vint, err := strconv.ParseUint(v, 10, 0)
+			vint, err := strconv.ParseUint(v, 10, 64)
 			if err != nil {
 				return fmt.Errorf("convert %s error: %s\n", envName, err)
 			}
@@ -86,7 +102,8 @@ func Parse(conf interface{}, prefix ...string) error {
 			fmt.Printf("%s is a slice\n", envName)
 			// field.Sli
 		case reflect.Struct:
-			if err := Parse(field, strings.Join(append(prefix, sName), "_")); err != nil {
+			pref := strings.Join(append(prefix, sName), "_")
+			if err := rangeOver(field, parseDefault, pref); err != nil {
 				return err
 			}
 		}
@@ -94,45 +111,12 @@ func Parse(conf interface{}, prefix ...string) error {
 	return nil
 }
 
+func Parse(conf interface{}, prefix string) error {
+	return rangeOver(conf, false, prefix)
+}
+
 func Default(conf interface{}) error {
-	confV := convertV(conf)
-	confT := confV.Type()
-	for i := 0; i < confV.NumField(); i++ {
-		var (
-			fieldStruct = confT.Field(i)
-			field       = confV.Field(i)
-			d           = fieldStruct.Tag.Get("default")
-		)
-		switch field.Kind() {
-		case reflect.String:
-			field.SetString(d)
-		case reflect.Int:
-			vint, err := strconv.Atoi(d)
-			if err != nil {
-				return fmt.Errorf("convert %s error: %s\n", fieldStruct.Name, err)
-
-			}
-			field.SetInt(int64(vint))
-		case reflect.Bool:
-			if strings.ToLower(d) == "true" {
-				field.SetBool(true)
-			} else {
-				field.SetBool(false)
-			}
-		case duration:
-			d, err := time.ParseDuration(d)
-			if err != nil {
-				return fmt.Errorf("parse duration %s error: %s\n", fieldStruct.Name, err)
-
-			}
-			field.SetInt(int64(d))
-		case reflect.Struct:
-			if err := Default(field); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
+	return rangeOver(conf, true, "")
 }
 
 func List(conf interface{}, prefix string) []string {
@@ -141,13 +125,13 @@ func List(conf interface{}, prefix string) []string {
 	confV := convertV(conf)
 	confT := confV.Type()
 	for i := 0; i < confV.NumField(); i++ {
-		field, sName, envName := getEnvName(confT, confV, i, prefix)
+		field, sName, envName, d := getEnvName(confT, confV, i, prefix)
 		switch field.Kind() {
 		case reflect.Struct:
 			list = append(list,
 				List(field, strings.Join([]string{prefix, sName}, "_"))...)
 		default:
-			list = append(list, envName+"=")
+			list = append(list, envName+"="+d)
 		}
 	}
 
