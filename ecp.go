@@ -1,5 +1,5 @@
-// ecp is a package to convert environments to configurations
-// you need to do nothing but import this packet and then, Parse it
+// Package ecp can help you convert environments into configurations
+// it's an environment config parser
 package ecp
 
 import (
@@ -12,7 +12,6 @@ import (
 )
 
 var (
-	debug    = false
 	duration = reflect.TypeOf(time.Second * 1).Kind()
 )
 
@@ -25,7 +24,7 @@ func convertV(conf interface{}) reflect.Value {
 }
 
 func getEnvName(confT reflect.Type, confV reflect.Value, i int,
-	prefix ...string) (reflect.Value, string, string, string) {
+	prefix string) (reflect.Value, string, string, string) {
 	field := confV.Field(i)
 	sName := confT.Field(i).Name
 	tag := confT.Field(i).Tag
@@ -34,7 +33,7 @@ func getEnvName(confT reflect.Type, confV reflect.Value, i int,
 		sName = y
 	}
 
-	envName := strings.ToUpper(strings.Join(append(prefix, sName), "_"))
+	envName := strings.ToUpper(prefix + "_" + sName)
 	if e := tag.Get("env"); e != "" {
 		envName = e
 	}
@@ -47,7 +46,7 @@ func parseSlice(v string, field reflect.Value) error {
 	if v == "" {
 		return nil
 	}
-	stringSlice := strings.Split(v, " ") // test here
+	stringSlice := strings.Split(v, ",") // split by commas
 	field.Set(reflect.MakeSlice(field.Type(), len(stringSlice), cap(stringSlice)))
 
 	switch field.Type().String() {
@@ -78,14 +77,14 @@ func parseSlice(v string, field reflect.Value) error {
 	return nil
 }
 
-func rangeOver(conf interface{}, parseDefault bool, prefix ...string) error {
+func rangeOver(conf interface{}, parseDefault bool, prefix string) error {
 	confV := convertV(conf)
 	confT := confV.Type()
 	for i := 0; i < confV.NumField(); i++ {
-		field, sName, envName, d := getEnvName(confT, confV, i, prefix...)
+		field, sName, envName, d := getEnvName(confT, confV, i, prefix)
 
-		v := os.Getenv(envName)
-		if parseDefault {
+		v, exist := os.LookupEnv(envName)
+		if parseDefault || !exist {
 			v = d
 		}
 
@@ -96,10 +95,6 @@ func rangeOver(conf interface{}, parseDefault bool, prefix ...string) error {
 		kind := field.Kind()
 		if v == "" && kind != reflect.Struct {
 			continue
-		}
-
-		if debug {
-			fmt.Printf("set %s=%s\n", envName, v)
 		}
 
 		switch kind {
@@ -144,15 +139,12 @@ func rangeOver(conf interface{}, parseDefault bool, prefix ...string) error {
 			field.SetBool(b)
 
 		case reflect.Slice:
-			if debug {
-				fmt.Printf("%s is a %s\n", envName, field.Type().String())
-			}
 			if err := parseSlice(v, field); err != nil {
 				return err
 			}
 
 		case reflect.Struct:
-			pref := strings.Join(append(prefix, sName), "_")
+			pref := strings.ToUpper(prefix + "_" + sName)
 			if err := rangeOver(field, parseDefault, pref); err != nil {
 				return err
 			}
@@ -162,14 +154,17 @@ func rangeOver(conf interface{}, parseDefault bool, prefix ...string) error {
 	return nil
 }
 
+// Parse the conf through environments with the prefix key
 func Parse(conf interface{}, prefix string) error {
 	return rangeOver(conf, false, prefix)
 }
 
+// Default set the conf with its default value
 func Default(conf interface{}) error {
 	return rangeOver(conf, true, "")
 }
 
+// List all the config environment keys
 func List(conf interface{}, prefix string) []string {
 	list := []string{}
 
