@@ -11,6 +11,11 @@ The environment config keys can be auto generated or set by the `yaml` or `env` 
 
 The only thing you should do is importing this package, and `Parse` your config.
 
+[![Go Report Card](https://goreportcard.com/badge/github.com/wrfly/ecp)](https://goreportcard.com/report/github.com/wrfly/ecp)
+[![Build Status](https://travis-ci.org/wrfly/ecp.svg?branch=master)](https://travis-ci.org/wrfly/ecp)
+[![GoDoc](https://godoc.org/github.com/wrfly/ecp?status.svg)](https://godoc.org/github.com/wrfly/ecp)
+[![license](https://img.shields.io/github/license/wrfly/ecp.svg)](https://github.com/wrfly/ecp/blob/master/LICENSE)
+
 ## Usage Example
 
 ```go
