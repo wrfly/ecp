@@ -11,10 +11,6 @@ import (
 	"time"
 )
 
-var (
-	duration = reflect.TypeOf(time.Second * 1).Kind()
-)
-
 func convertV(conf interface{}) reflect.Value {
 	confV, ok := conf.(reflect.Value)
 	if !ok {
@@ -99,25 +95,31 @@ func rangeOver(conf interface{}, parseDefault bool, prefix string) error {
 
 		switch kind {
 		case reflect.String:
+			if field.String() != "" && !exist {
+				break
+			}
 			field.SetString(v)
 
 		case reflect.Float32, reflect.Float64:
+			if field.Float() != 0 && !exist {
+				break
+			}
 			f, err := strconv.ParseFloat(v, 64)
 			if err != nil {
 				return fmt.Errorf("convert %s error: %s\n", envName, err)
 			}
 			field.SetFloat(f)
 
-		case duration:
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+			if field.Int() != 0 && !exist {
+				break
+			}
 			// since duration is int64 too, parse it first
 			d, err := time.ParseDuration(v)
 			if err == nil {
 				field.SetInt(int64(d))
-				continue
+				break
 			}
-			fallthrough
-
-		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 			vint, err := strconv.Atoi(v)
 			if err != nil {
 				return fmt.Errorf("convert %s error: %s\n", envName, err)
@@ -125,6 +127,9 @@ func rangeOver(conf interface{}, parseDefault bool, prefix string) error {
 			field.SetInt(int64(vint))
 
 		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+			if field.Uint() != 0 && !exist {
+				break
+			}
 			vint, err := strconv.ParseUint(v, 10, 64)
 			if err != nil {
 				return fmt.Errorf("convert %s error: %s\n", envName, err)
@@ -136,9 +141,15 @@ func rangeOver(conf interface{}, parseDefault bool, prefix string) error {
 			if err != nil {
 				return err
 			}
+			if !exist && field.Bool() != b {
+				break
+			}
 			field.SetBool(b)
 
 		case reflect.Slice:
+			if !field.IsNil() && !exist {
+				break
+			}
 			if err := parseSlice(v, field); err != nil {
 				return err
 			}
