@@ -17,7 +17,7 @@ type subConfig struct {
 	Duration   time.Duration `default:"1m"`
 }
 
-type config struct {
+type configType struct {
 	LogLevel string    `yaml:"log-level"`
 	Port     int       `yaml:"port" default:8080`
 	SliceStr []string  `env:"STRING_SLICE" default:"aa,bb,cc"`
@@ -26,10 +26,10 @@ type config struct {
 }
 
 func TestList(t *testing.T) {
-	conf := config{
+	config := configType{
 		LogLevel: "debug",
 	}
-	list := List(conf, "PREFIX")
+	list := List(config, "PREFIX")
 	for _, key := range list {
 		t.Logf("%s", key)
 	}
@@ -46,23 +46,23 @@ func TestParse(t *testing.T) {
 	os.Setenv("STRING_SLICE", "a,b,c")
 	os.Setenv("INT_SLICE", "1,2,3")
 
-	conf := config{
+	config := configType{
 		LogLevel: "debug",
 		Port:     999,
 	}
-	if err := Parse(&conf, "PREFIX"); err != nil {
+	if err := Parse(&config, "PREFIX"); err != nil {
 		t.Error(err)
 	}
-	t.Logf("%+v", conf)
+	t.Logf("%+v", config)
 }
 
 func TestDefault(t *testing.T) {
-	conf := config{
+	config := configType{
 		LogLevel: "debug",
 		Port:     999,
 	}
-	if err := Default(&conf); err != nil {
+	if err := Default(&config); err != nil {
 		t.Error(err)
 	}
-	t.Logf("%+v", conf)
+	t.Logf("%+v", config)
 }

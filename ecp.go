@@ -11,19 +11,19 @@ import (
 	"time"
 )
 
-func convertV(conf interface{}) reflect.Value {
-	confV, ok := conf.(reflect.Value)
+func toValue(config interface{}) reflect.Value {
+	value, ok := config.(reflect.Value)
 	if !ok {
-		confV = reflect.Indirect(reflect.ValueOf(conf))
+		value = reflect.Indirect(reflect.ValueOf(config))
 	}
-	return confV
+	return value
 }
 
-func getEnvName(confT reflect.Type, confV reflect.Value, i int,
+func getEnvName(configType reflect.Type, configValue reflect.Value, i int,
 	prefix string) (reflect.Value, string, string, string) {
-	field := confV.Field(i)
-	sName := confT.Field(i).Name
-	tag := confT.Field(i).Tag
+	field := configValue.Field(i)
+	sName := configType.Field(i).Name
+	tag := configType.Field(i).Tag
 
 	if y := tag.Get("yaml"); y != "" {
 		sName = y
@@ -73,11 +73,11 @@ func parseSlice(v string, field reflect.Value) error {
 	return nil
 }
 
-func rangeOver(conf interface{}, parseDefault bool, prefix string) error {
-	confV := convertV(conf)
-	confT := confV.Type()
-	for i := 0; i < confV.NumField(); i++ {
-		field, sName, envName, d := getEnvName(confT, confV, i, prefix)
+func rangeOver(config interface{}, parseDefault bool, prefix string) error {
+	configValue := toValue(config)
+	configType := configValue.Type()
+	for i := 0; i < configValue.NumField(); i++ {
+		field, sName, envName, d := getEnvName(configType, configValue, i, prefix)
 
 		v, exist := os.LookupEnv(envName)
 		if parseDefault || !exist {
@@ -165,24 +165,24 @@ func rangeOver(conf interface{}, parseDefault bool, prefix string) error {
 	return nil
 }
 
-// Parse the conf through environments with the prefix key
-func Parse(conf interface{}, prefix string) error {
-	return rangeOver(conf, false, prefix)
+// Parse the config through environments with the prefix key
+func Parse(config interface{}, prefix string) error {
+	return rangeOver(config, false, prefix)
 }
 
-// Default set the conf with its default value
-func Default(conf interface{}) error {
-	return rangeOver(conf, true, "")
+// Default set the config with its default value
+func Default(config interface{}) error {
+	return rangeOver(config, true, "")
 }
 
 // List all the config environment keys
-func List(conf interface{}, prefix string) []string {
+func List(config interface{}, prefix string) []string {
 	list := []string{}
 
-	confV := convertV(conf)
-	confT := confV.Type()
-	for i := 0; i < confV.NumField(); i++ {
-		field, sName, envName, d := getEnvName(confT, confV, i, prefix)
+	configValue := toValue(config)
+	configType := configValue.Type()
+	for i := 0; i < configValue.NumField(); i++ {
+		field, sName, envName, d := getEnvName(configType, configValue, i, prefix)
 		switch field.Kind() {
 		case reflect.Struct:
 			list = append(list,
