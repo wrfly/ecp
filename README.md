@@ -52,6 +52,7 @@ func main() {
     }
     fmt.Println()
 
+    // then parse configuration from environments
     if err := ecp.Parse(config, "ECP"); err != nil {
         panic(err)
     }
@@ -59,7 +60,7 @@ func main() {
         config.LogLevel, config.Port)
     fmt.Println()
 
-    fmt.Println("the env keys are as follows:")
+    // and list all the env keys
     envLists := ecp.List(config, "ecp")
     for _, k := range envLists {
         fmt.Println(k)
@@ -77,7 +78,6 @@ export PORT=1234
 
 new log level: [ info ], port: [ 1234 ]
 
-the env keys are as follows:
 ECP_LOGLEVEL=debug
 PORT=
 ```

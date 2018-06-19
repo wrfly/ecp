@@ -85,3 +85,50 @@ func TestDefault(t *testing.T) {
 	}
 	t.Logf("%+v", config)
 }
+
+func ExampleParse() {
+	type config struct {
+		Age  int
+		Name string
+	}
+	c := &config{}
+	os.Setenv("ECP_AGE", "10")
+	if err := Parse(&c); err != nil {
+		panic(err)
+	}
+
+	// c.Age=10
+	if c.Age != 10 {
+		panic("???")
+	}
+}
+
+func ExampleList() {
+	type config struct {
+		Age  int
+		Name string
+	}
+	for _, key := range List(config{}) {
+		fmt.Println("env" + key)
+	}
+
+	// env ECP_AGE=
+	// env ECP_NAME=
+}
+
+func ExampleDefault() {
+	type config struct {
+		Age  int    `default:"10"`
+		Name string `default:"wrfly"`
+	}
+	c := &config{}
+	if err := Default(&c); err != nil {
+		panic(err)
+	}
+
+	// now you'll get a config with
+	// `Age=10` and `Name=wrfly`
+	if c.Age != 10 || c.Name != "wrfly" {
+		panic("???")
+	}
+}
