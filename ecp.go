@@ -165,28 +165,60 @@ func rangeOver(config interface{}, parseDefault bool, prefix string) error {
 	return nil
 }
 
-// Parse the config through environments with the prefix key
-func Parse(config interface{}, prefix string) error {
-	return rangeOver(config, false, prefix)
+// note Parse function will overwrite the existing value if there is a
+// envitonment configration matched with the struct name or the "env" tag
+// name.
+
+// Parse the configuration through environments starting with the prefix
+// or you can ignore the prefix and the default prefix key will be `ECP`
+// ecp.Parse(&config) or ecp.Parse(&config, "PREFIX")
+func Parse(config interface{}, prefix ...string) error {
+	if prefix == nil {
+		prefix = []string{"ECP"}
+	}
+	return rangeOver(config, false, prefix[0])
 }
 
-// Default set the config with its default value
+// the default value of the config is set by a tag named "default"
+// for example, you can define a struct like:
+//
+//    type config struct {
+//        One   string   `default:"1"`
+//        Two   int      `default:"2"`
+//        Three []string `default:"1,2,3"`
+//    }
+//    c := &config{}
+//
+// then you can use ecp.Default(&c) to parse the default value to the struct.
+// note, the Default function will not overwrite the existing value, if the
+// config key has already been set nomatter whether it has a default tag.
+// And the default value will be nil (nil of the type) if the "default" tag is
+// empty.
+
+// Default set config with its default value
 func Default(config interface{}) error {
 	return rangeOver(config, true, "")
 }
 
-// List all the config environment keys
-func List(config interface{}, prefix string) []string {
+// List function will also fill up the value of the envitonment key
+// it the "default" tag has value
+
+// List all the config environments
+func List(config interface{}, prefix ...string) []string {
 	list := []string{}
+
+	if prefix == nil {
+		prefix = []string{"ECP"}
+	}
 
 	configValue := toValue(config)
 	configType := configValue.Type()
 	for i := 0; i < configValue.NumField(); i++ {
-		field, sName, envName, d := getEnvName(configType, configValue, i, prefix)
+		field, sName, envName, d := getEnvName(configType, configValue, i, prefix[0])
 		switch field.Kind() {
 		case reflect.Struct:
 			list = append(list,
-				List(field, strings.Join([]string{prefix, sName}, "_"))...)
+				List(field, strings.Join([]string{prefix[0], sName}, "_"))...)
 		default:
 			list = append(list, envName+"="+d)
 		}
