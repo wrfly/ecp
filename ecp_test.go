@@ -3,6 +3,7 @@ package ecp
 import (
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 	"time"
 )
@@ -13,7 +14,7 @@ type subConfig struct {
 	Int        int           `default:"-1"`
 	Uint       uint          `default:"1"`
 	F          float32       `default:"3.14"`
-	FloatSlice []float32     `default:"1.1,2.2,3.3"`
+	FloatSlice []float32     `default:"1.1 2.2 3.3"`
 	F64        float64       `default:"3.15"`
 	Duration   time.Duration `default:"1m"`
 }
@@ -21,8 +22,8 @@ type subConfig struct {
 type configType struct {
 	LogLevel string    `yaml:"log-level"`
 	Port     int       `yaml:"port" default:"8080"`
-	SliceStr []string  `env:"STRING_SLICE" default:"aa,bb,cc"`
-	SliceInt []int     `env:"INT_SLICE" default:"-1,-2,-3"`
+	SliceStr []string  `env:"STRING_SLICE" default:"aa bb cc"`
+	SliceInt []int     `env:"INT_SLICE" default:"-1 -2 -3"`
 	Sub      subConfig `yaml:"sub"`
 }
 
@@ -33,33 +34,37 @@ func TestList(t *testing.T) {
 	t.Run("list with empty prefix", func(t *testing.T) {
 		list := List(config)
 		for _, key := range list {
-			t.Logf("%s", key)
+			fmt.Printf("%s\n", key)
 		}
 	})
 
 	t.Run("list with user defined prefix", func(t *testing.T) {
 		list := List(config, "PPPPREFIX")
 		for _, key := range list {
-			t.Logf("%s", key)
+			fmt.Printf("%s\n", key)
 		}
 	})
 }
 
 func TestParse(t *testing.T) {
 	envs := map[string]string{
-		"ECP_SLICE":        "1 2 3 4",
-		"INT_SLICE":        "1,2,3",
+		"INT_SLICE":        "1 2 3",
 		"ECP_SUB_INT":      "-2333",
 		"ECP_SUB_BOOL":     "true",
-		"STRING_SLICE":     "a,b,c",
+		"STRING_SLICE":     "a b c",
 		"ECP_SUB_UINT":     "123456789",
 		"ECP_SUB_INT64":    "6666",
 		"ECP_LOG-LEVEL":    "info",
 		"ECP_SUB_DURATION": "10s",
 	}
+
+	fmt.Println("set environment")
 	for k, v := range envs {
-		fmt.Printf("export %s=%s\n", k, v)
 		os.Setenv(k, v)
+		if strings.Contains(v, " ") {
+			v = fmt.Sprintf("\"%s\"", v)
+		}
+		fmt.Printf("export %s=%s\n", k, v)
 	}
 
 	config := configType{
@@ -72,7 +77,7 @@ func TestParse(t *testing.T) {
 	if config.Sub.Duration != time.Second*10 {
 		t.Error("parse time duration failed")
 	}
-	t.Logf("%+v", config)
+	fmt.Printf("%+v\n", config)
 }
 
 func TestDefault(t *testing.T) {
@@ -83,7 +88,7 @@ func TestDefault(t *testing.T) {
 	if err := Default(&config); err != nil {
 		t.Error(err)
 	}
-	t.Logf("%+v", config)
+	fmt.Printf("%+v", config)
 }
 
 func ExampleParse() {

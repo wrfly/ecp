@@ -42,7 +42,9 @@ func parseSlice(v string, field reflect.Value) error {
 	if v == "" {
 		return nil
 	}
-	stringSlice := strings.Split(v, ",") // split by commas
+	// either space nor commas is perfect, but I think space is better
+	// since it's more natural: fmt.Println([]int{1, 2, 3}) = [1 2 3]
+	stringSlice := strings.Split(v, " ") // split by space
 	field.Set(reflect.MakeSlice(field.Type(), len(stringSlice), cap(stringSlice)))
 
 	switch field.Type().String() {
@@ -220,6 +222,9 @@ func List(config interface{}, prefix ...string) []string {
 			list = append(list,
 				List(field, strings.Join([]string{prefix[0], sName}, "_"))...)
 		default:
+			if strings.Contains(d, " ") {
+				d = fmt.Sprintf("\"%s\"", d)
+			}
 			list = append(list, envName+"="+d)
 		}
 	}
