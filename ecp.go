@@ -26,7 +26,7 @@ func getEnvName(configType reflect.Type, configValue reflect.Value, i int,
 	tag := configType.Field(i).Tag
 
 	if y := tag.Get("yaml"); y != "" {
-		sName = y
+		sName = strings.Split(y, ",")[0]
 	}
 
 	envName := strings.ToUpper(prefix + "_" + sName)
