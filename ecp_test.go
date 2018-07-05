@@ -9,14 +9,15 @@ import (
 )
 
 type subConfig struct {
-	Bool       bool          `default:"true"`
-	Int64      int64         `default:"666664"`
-	Int        int           `default:"-1"`
-	Uint       uint          `default:"1"`
-	F          float32       `default:"3.14"`
-	FloatSlice []float32     `default:"1.1 2.2 3.3"`
-	F64        float64       `default:"3.15"`
-	Duration   time.Duration `default:"1m"`
+	Bool        bool          `default:"true"`
+	Int64       int64         `default:"666664"`
+	Int         int           `default:"-1"`
+	Uint        uint          `default:"1"`
+	F           float32       `default:"3.14"`
+	FloatSlice  []float32     `default:"1.1 2.2 3.3"`
+	F64         float64       `default:"3.15"`
+	Duration    time.Duration `default:"1m"`
+	IgnoreMeToo string        `yaml:"-"`
 }
 
 type configType struct {
@@ -25,6 +26,8 @@ type configType struct {
 	SliceStr []string  `env:"STRING_SLICE" default:"aa bb cc"`
 	SliceInt []int     `env:"INT_SLICE" default:"-1 -2 -3"`
 	Sub      subConfig `yaml:"sub"`
+	// the default value will not work since the ignote `-`
+	IgnoreMe string `yaml:"-" default:"ignore me"`
 }
 
 func TestList(t *testing.T) {

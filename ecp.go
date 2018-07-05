@@ -22,19 +22,19 @@ func toValue(config interface{}) reflect.Value {
 func getEnvName(configType reflect.Type, configValue reflect.Value, i int,
 	prefix string) (reflect.Value, string, string, string) {
 	field := configValue.Field(i)
-	sName := configType.Field(i).Name
+	structName := configType.Field(i).Name
 	tag := configType.Field(i).Tag
 
 	if y := tag.Get("yaml"); y != "" {
-		sName = strings.Split(y, ",")[0]
+		structName = strings.Split(y, ",")[0]
 	}
 
-	envName := strings.ToUpper(prefix + "_" + sName)
+	envName := strings.ToUpper(prefix + "_" + structName)
 	if e := tag.Get("env"); e != "" {
-		envName = e
+		envName = strings.Split(e, ",")[0]
 	}
 
-	return field, sName, envName, tag.Get("default")
+	return field, structName, envName, tag.Get("default")
 
 }
 
@@ -79,7 +79,12 @@ func rangeOver(config interface{}, parseDefault bool, prefix string) error {
 	configValue := toValue(config)
 	configType := configValue.Type()
 	for i := 0; i < configValue.NumField(); i++ {
-		field, sName, envName, d := getEnvName(configType, configValue, i, prefix)
+		field, structName, envName, d := getEnvName(configType, configValue, i, prefix)
+
+		// skip this filed if its name is `-`
+		if structName == "-" || envName == "-" {
+			continue
+		}
 
 		v, exist := os.LookupEnv(envName)
 		if parseDefault || !exist {
@@ -157,7 +162,7 @@ func rangeOver(config interface{}, parseDefault bool, prefix string) error {
 			}
 
 		case reflect.Struct:
-			pref := strings.ToUpper(prefix + "_" + sName)
+			pref := strings.ToUpper(prefix + "_" + structName)
 			if err := rangeOver(field, parseDefault, pref); err != nil {
 				return err
 			}
@@ -216,11 +221,14 @@ func List(config interface{}, prefix ...string) []string {
 	configValue := toValue(config)
 	configType := configValue.Type()
 	for i := 0; i < configValue.NumField(); i++ {
-		field, sName, envName, d := getEnvName(configType, configValue, i, prefix[0])
+		field, structName, envName, d := getEnvName(configType, configValue, i, prefix[0])
+		if structName == "-" || envName == "" {
+			continue
+		}
 		switch field.Kind() {
 		case reflect.Struct:
 			list = append(list,
-				List(field, strings.Join([]string{prefix[0], sName}, "_"))...)
+				List(field, strings.Join([]string{prefix[0], structName}, "_"))...)
 		default:
 			if strings.Contains(d, " ") {
 				d = fmt.Sprintf("\"%s\"", d)
