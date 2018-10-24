@@ -113,7 +113,7 @@ func rangeOver(config interface{}, parseDefault bool, prefix string) error {
 			}
 			f, err := strconv.ParseFloat(v, 64)
 			if err != nil {
-				return fmt.Errorf("convert %s error: %s\n", envName, err)
+				return fmt.Errorf("convert %s error: %s", envName, err)
 			}
 			field.SetFloat(f)
 
@@ -122,6 +122,16 @@ func rangeOver(config interface{}, parseDefault bool, prefix string) error {
 				break
 			}
 			// since duration is int64 too, parse it first
+			// if the duration contains `d` (day), we should support it
+			// fix #6
+			if strings.Contains(v, "d") {
+				day := v[:len(v)-1]
+				dayN, err := strconv.Atoi(day)
+				if err != nil {
+					return fmt.Errorf("convert %s error: %s", envName, err)
+				}
+				v = fmt.Sprintf("%dh", dayN*24)
+			}
 			d, err := time.ParseDuration(v)
 			if err == nil {
 				field.SetInt(int64(d))
@@ -129,7 +139,7 @@ func rangeOver(config interface{}, parseDefault bool, prefix string) error {
 			}
 			vint, err := strconv.Atoi(v)
 			if err != nil {
-				return fmt.Errorf("convert %s error: %s\n", envName, err)
+				return fmt.Errorf("convert %s error: %s", envName, err)
 			}
 			field.SetInt(int64(vint))
 
@@ -139,7 +149,7 @@ func rangeOver(config interface{}, parseDefault bool, prefix string) error {
 			}
 			vint, err := strconv.ParseUint(v, 10, 64)
 			if err != nil {
-				return fmt.Errorf("convert %s error: %s\n", envName, err)
+				return fmt.Errorf("convert %s error: %s", envName, err)
 			}
 			field.SetUint(vint)
 

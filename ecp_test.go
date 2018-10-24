@@ -17,6 +17,7 @@ type subConfig struct {
 	FloatSlice  []float32     `default:"1.1 2.2 3.3"`
 	F64         float64       `default:"3.15"`
 	Duration    time.Duration `default:"1m"`
+	DurationDay time.Duration `default:"6d"`
 	IgnoreMeToo string        `yaml:"-"`
 }
 
