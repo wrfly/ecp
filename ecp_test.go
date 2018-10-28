@@ -3,6 +3,7 @@ package ecp
 import (
 	"fmt"
 	"os"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -22,7 +23,7 @@ type subConfig struct {
 }
 
 type configType struct {
-	LogLevel string    `yaml:"log-level"`
+	LogLevel string    `yaml:"log-level" default:"info"`
 	Port     int       `yaml:"port" default:"8080"`
 	SliceStr []string  `env:"STRING_SLICE" default:"aa bb cc"`
 	SliceInt []int     `env:"INT_SLICE" default:"-1 -2 -3"`
@@ -38,15 +39,27 @@ func TestList(t *testing.T) {
 	t.Run("list with empty prefix", func(t *testing.T) {
 		list := List(config)
 		for _, key := range list {
-			fmt.Printf("%s\n", key)
+			t.Logf("%s\n", key)
 		}
 	})
 
 	t.Run("list with user defined prefix", func(t *testing.T) {
 		list := List(config, "PPPPREFIX")
 		for _, key := range list {
-			fmt.Printf("%s\n", key)
+			t.Logf("%s\n", key)
 		}
+	})
+
+	t.Run("with get key", func(t *testing.T) {
+		GetKey = func(parentName, structName string, tag reflect.StructTag) (key string) {
+			return strings.ToLower(parentName) + "." + strings.ToLower(structName)
+		}
+		list := List(config)
+		for _, key := range list {
+			t.Logf("%s\n", key)
+		}
+
+		GetKey = EnvGetKey
 	})
 }
 
@@ -62,13 +75,13 @@ func TestParse(t *testing.T) {
 		"ECP_SUB_DURATION": "10s",
 	}
 
-	fmt.Println("set environment")
+	t.Log("set environment")
 	for k, v := range envs {
 		os.Setenv(k, v)
 		if strings.Contains(v, " ") {
 			v = fmt.Sprintf("\"%s\"", v)
 		}
-		fmt.Printf("export %s=%s\n", k, v)
+		t.Logf("export %s=%s", k, v)
 	}
 
 	config := configType{
@@ -81,7 +94,7 @@ func TestParse(t *testing.T) {
 	if config.Sub.Duration != time.Second*10 {
 		t.Error("parse time duration failed")
 	}
-	fmt.Printf("%+v\n", config)
+	t.Logf("%+v", config)
 }
 
 func TestDefault(t *testing.T) {
@@ -92,7 +105,65 @@ func TestDefault(t *testing.T) {
 	if err := Default(&config); err != nil {
 		t.Error(err)
 	}
-	fmt.Printf("%+v", config)
+	t.Logf("%+v", config)
+}
+
+func TestGetKeyLookupValue(t *testing.T) {
+	config := configType{}
+
+	GetKey = func(parentName, structName string, tag reflect.StructTag) (key string) {
+		return parentName + "." + structName
+	}
+
+	LookupValue = func(field reflect.Value, key string) (value string, exist bool) {
+		switch field.Kind() {
+		case reflect.String:
+			return "string", true
+		case reflect.Int:
+			return "1", true
+		case reflect.Int64:
+			return "164", true
+		case reflect.Float64:
+			return "2.333", true
+		case reflect.Bool:
+			return "tRuE", true
+		}
+		return "", false
+	}
+
+	if err := Parse(&config); err != nil {
+		t.Error(err)
+	}
+	t.Logf("%+v", config)
+}
+
+func TestIgnoreFunc(t *testing.T) {
+	config1 := configType{}
+	if err := Parse(&config1); err != nil {
+		t.Error(err)
+	}
+
+	config2 := configType{}
+	IgnoreKey = func(field reflect.Value, key string) bool {
+		switch field.Kind() {
+		case reflect.Int64, reflect.Int, reflect.Uint:
+		case reflect.String:
+		default:
+			return false
+		}
+		return true
+	}
+	if err := Parse(&config2); err != nil {
+		t.Fatal(err)
+	}
+
+	if config1.Port == config2.Port {
+		t.Error("not going to happen")
+	}
+
+	if config1.LogLevel == config2.LogLevel {
+		t.Error("not going to happen")
+	}
 }
 
 func ExampleParse() {
@@ -118,7 +189,7 @@ func ExampleList() {
 		Name string
 	}
 	for _, key := range List(config{}) {
-		fmt.Println("env" + key)
+		fmt.Printf("env %s", key)
 	}
 
 	// env ECP_AGE=
@@ -127,8 +198,9 @@ func ExampleList() {
 
 func ExampleDefault() {
 	type config struct {
-		Age  int    `default:"10"`
-		Name string `default:"wrfly"`
+		Age      int           `default:"10"`
+		Name     string        `default:"wrfly"`
+		Duration time.Duration `default:"10d"`
 	}
 	c := &config{}
 	if err := Default(&c); err != nil {
@@ -137,7 +209,7 @@ func ExampleDefault() {
 
 	// now you'll get a config with
 	// `Age=10` and `Name=wrfly`
-	if c.Age != 10 || c.Name != "wrfly" {
+	if c.Age != 10 || c.Name != "wrfly" || c.Duration != time.Hour*24*10 {
 		panic("???")
 	}
 }

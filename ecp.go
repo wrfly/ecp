@@ -11,6 +11,33 @@ import (
 	"time"
 )
 
+var (
+	GetKey      func(parentName, structName string, tag reflect.StructTag) (key string)
+	LookupValue func(field reflect.Value, key string) (value string, exist bool)
+	IgnoreKey   func(field reflect.Value, key string) bool
+
+	// env get functions
+	EnvGetKey = func(parentName, structName string, tag reflect.StructTag) (key string) {
+		key = strings.ToUpper(parentName + "_" + structName)
+		if e := tag.Get("env"); e != "" {
+			key = strings.Split(e, ",")[0]
+		}
+		return
+	}
+	EnvLookupValue = func(field reflect.Value, key string) (value string, exist bool) {
+		return os.LookupEnv(key)
+	}
+	EnvIgnore = func(field reflect.Value, key string) bool {
+		return key == "-"
+	}
+)
+
+func init() {
+	GetKey = EnvGetKey
+	IgnoreKey = EnvIgnore
+	LookupValue = EnvLookupValue
+}
+
 func toValue(config interface{}) reflect.Value {
 	value, ok := config.(reflect.Value)
 	if !ok {
@@ -19,23 +46,23 @@ func toValue(config interface{}) reflect.Value {
 	return value
 }
 
-func getEnvName(configType reflect.Type, configValue reflect.Value, i int,
-	prefix string) (reflect.Value, string, string, string) {
-	field := configValue.Field(i)
-	structName := configType.Field(i).Name
+func getAll(configType reflect.Type, configValue reflect.Value,
+	i int, parentName string) (field reflect.Value, structName string,
+	keyName string, defaultV string) {
+
+	field = configValue.Field(i)
+	structName = configType.Field(i).Name
 	tag := configType.Field(i).Tag
 
+	// config often use yaml, so I use yaml
 	if y := tag.Get("yaml"); y != "" {
 		structName = strings.Split(y, ",")[0]
 	}
 
-	envName := strings.ToUpper(prefix + "_" + structName)
-	if e := tag.Get("env"); e != "" {
-		envName = strings.Split(e, ",")[0]
-	}
+	keyName = GetKey(parentName, structName, tag)
 
-	return field, structName, envName, tag.Get("default")
-
+	defaultV = tag.Get("default")
+	return
 }
 
 func parseSlice(v string, field reflect.Value) error {
@@ -45,7 +72,8 @@ func parseSlice(v string, field reflect.Value) error {
 	// either space nor commas is perfect, but I think space is better
 	// since it's more natural: fmt.Println([]int{1, 2, 3}) = [1 2 3]
 	stringSlice := strings.Split(v, " ") // split by space
-	field.Set(reflect.MakeSlice(field.Type(), len(stringSlice), cap(stringSlice)))
+	field.Set(reflect.MakeSlice(field.Type(),
+		len(stringSlice), cap(stringSlice)))
 
 	switch field.Type().String() {
 	case "[]string":
@@ -75,20 +103,24 @@ func parseSlice(v string, field reflect.Value) error {
 	return nil
 }
 
-func rangeOver(config interface{}, parseDefault bool, prefix string) error {
+func rangeOver(config interface{}, parseDefault bool, parentName string) error {
 	configValue := toValue(config)
 	configType := configValue.Type()
 	for i := 0; i < configValue.NumField(); i++ {
-		field, structName, envName, d := getEnvName(configType, configValue, i, prefix)
+		field, structName, keyName,
+			defaultV := getAll(configType, configValue, i, parentName)
 
-		// skip this filed if its name is `-`
-		if structName == "-" || envName == "-" {
+		// ignore this key
+		if IgnoreKey(field, structName) {
+			continue
+		}
+		if IgnoreKey(field, keyName) {
 			continue
 		}
 
-		v, exist := os.LookupEnv(envName)
+		v, exist := LookupValue(field, keyName)
 		if parseDefault || !exist {
-			v = d
+			v = defaultV
 		}
 
 		if !field.CanAddr() {
@@ -113,11 +145,12 @@ func rangeOver(config interface{}, parseDefault bool, prefix string) error {
 			}
 			f, err := strconv.ParseFloat(v, 64)
 			if err != nil {
-				return fmt.Errorf("convert %s error: %s", envName, err)
+				return fmt.Errorf("convert %s error: %s", keyName, err)
 			}
 			field.SetFloat(f)
 
-		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		case reflect.Int, reflect.Int8,
+			reflect.Int16, reflect.Int32, reflect.Int64:
 			if field.Int() != 0 && !exist {
 				break
 			}
@@ -128,7 +161,7 @@ func rangeOver(config interface{}, parseDefault bool, prefix string) error {
 				day := v[:len(v)-1]
 				dayN, err := strconv.Atoi(day)
 				if err != nil {
-					return fmt.Errorf("convert %s error: %s", envName, err)
+					return fmt.Errorf("convert %s error: %s", keyName, err)
 				}
 				v = fmt.Sprintf("%dh", dayN*24)
 			}
@@ -139,22 +172,23 @@ func rangeOver(config interface{}, parseDefault bool, prefix string) error {
 			}
 			vint, err := strconv.Atoi(v)
 			if err != nil {
-				return fmt.Errorf("convert %s error: %s", envName, err)
+				return fmt.Errorf("convert %s error: %s", keyName, err)
 			}
 			field.SetInt(int64(vint))
 
-		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		case reflect.Uint, reflect.Uint8,
+			reflect.Uint16, reflect.Uint32, reflect.Uint64:
 			if field.Uint() != 0 && !exist {
 				break
 			}
 			vint, err := strconv.ParseUint(v, 10, 64)
 			if err != nil {
-				return fmt.Errorf("convert %s error: %s", envName, err)
+				return fmt.Errorf("convert %s error: %s", keyName, err)
 			}
 			field.SetUint(vint)
 
 		case reflect.Bool:
-			b, err := strconv.ParseBool(v)
+			b, err := strconv.ParseBool(strings.ToLower(v))
 			if err != nil {
 				return err
 			}
@@ -172,7 +206,7 @@ func rangeOver(config interface{}, parseDefault bool, prefix string) error {
 			}
 
 		case reflect.Struct:
-			pref := strings.ToUpper(prefix + "_" + structName)
+			pref := strings.ToUpper(parentName + "_" + structName)
 			if err := rangeOver(field, parseDefault, pref); err != nil {
 				return err
 			}
@@ -227,23 +261,25 @@ func List(config interface{}, prefix ...string) []string {
 	if prefix == nil {
 		prefix = []string{"ECP"}
 	}
+	parentName := prefix[0]
 
 	configValue := toValue(config)
 	configType := configValue.Type()
 	for i := 0; i < configValue.NumField(); i++ {
-		field, structName, envName, d := getEnvName(configType, configValue, i, prefix[0])
-		if structName == "-" || envName == "" {
+		field, structName, keyName,
+			d := getAll(configType, configValue, i, prefix[0])
+		if structName == "-" || keyName == "" {
 			continue
 		}
 		switch field.Kind() {
 		case reflect.Struct:
-			list = append(list,
-				List(field, strings.Join([]string{prefix[0], structName}, "_"))...)
+			p := GetKey(parentName, structName, "")
+			list = append(list, List(field, p)...)
 		default:
 			if strings.Contains(d, " ") {
 				d = fmt.Sprintf("\"%s\"", d)
 			}
-			list = append(list, envName+"="+d)
+			list = append(list, keyName+"="+d)
 		}
 	}
 
