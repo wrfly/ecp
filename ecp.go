@@ -157,8 +157,9 @@ func rangeOver(config interface{}, parseDefault bool, parentName string) error {
 			// since duration is int64 too, parse it first
 			// if the duration contains `d` (day), we should support it
 			// fix #6
-			if strings.Contains(v, "d") {
-				day := v[:len(v)-1]
+			last := len(v) - 1
+			if v[last] == 'd' {
+				day := v[:last]
 				dayN, err := strconv.Atoi(day)
 				if err != nil {
 					return fmt.Errorf("convert %s error: %s", keyName, err)
