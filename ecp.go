@@ -103,18 +103,29 @@ func parseSlice(v string, field reflect.Value) error {
 	return nil
 }
 
-func rangeOver(config interface{}, parseDefault bool, parentName string) error {
+func rangeOver(config interface{}, parseDefault, findKey bool, parentName, findName string) (reflect.Value, error) {
 	configValue := toValue(config)
 	configType := configValue.Type()
 	for i := 0; i < configValue.NumField(); i++ {
-		field, structName, keyName,
-			defaultV := getAll(configType, configValue, i, parentName)
+		field, structName, keyName, defaultV := getAll(configType, configValue, i, parentName)
+
+		if findKey {
+			pName := ""
+			if parentName == "" {
+				pName = structName
+			} else {
+				pName = parentName + "." + structName
+			}
+			if !strings.HasPrefix(findName, pName) {
+				continue
+			}
+			if findName == pName {
+				return field, nil
+			}
+		}
 
 		// ignore this key
-		if IgnoreKey(field, structName) {
-			continue
-		}
-		if IgnoreKey(field, keyName) {
+		if IgnoreKey(field, structName) || IgnoreKey(field, keyName) {
 			continue
 		}
 
@@ -128,7 +139,7 @@ func rangeOver(config interface{}, parseDefault bool, parentName string) error {
 		}
 
 		kind := field.Kind()
-		if v == "" && kind != reflect.Struct {
+		if v == "" && kind != reflect.Struct && (parentName == "" && findKey) {
 			continue
 		}
 
@@ -145,7 +156,7 @@ func rangeOver(config interface{}, parseDefault bool, parentName string) error {
 			}
 			f, err := strconv.ParseFloat(v, 64)
 			if err != nil {
-				return fmt.Errorf("convert %s error: %s", keyName, err)
+				return field, fmt.Errorf("convert %s error: %s", keyName, err)
 			}
 			field.SetFloat(f)
 
@@ -162,7 +173,7 @@ func rangeOver(config interface{}, parseDefault bool, parentName string) error {
 				day := v[:last]
 				dayN, err := strconv.Atoi(day)
 				if err != nil {
-					return fmt.Errorf("convert %s error: %s", keyName, err)
+					return field, fmt.Errorf("convert %s error: %s", keyName, err)
 				}
 				v = fmt.Sprintf("%dh", dayN*24)
 			}
@@ -173,7 +184,7 @@ func rangeOver(config interface{}, parseDefault bool, parentName string) error {
 			}
 			vint, err := strconv.Atoi(v)
 			if err != nil {
-				return fmt.Errorf("convert %s error: %s", keyName, err)
+				return field, fmt.Errorf("convert %s error: %s", keyName, err)
 			}
 			field.SetInt(int64(vint))
 
@@ -184,14 +195,14 @@ func rangeOver(config interface{}, parseDefault bool, parentName string) error {
 			}
 			vint, err := strconv.ParseUint(v, 10, 64)
 			if err != nil {
-				return fmt.Errorf("convert %s error: %s", keyName, err)
+				return field, fmt.Errorf("convert %s error: %s", keyName, err)
 			}
 			field.SetUint(vint)
 
 		case reflect.Bool:
 			b, err := strconv.ParseBool(strings.ToLower(v))
 			if err != nil {
-				return err
+				return field, err
 			}
 			if !exist && field.Bool() != b {
 				break
@@ -203,18 +214,27 @@ func rangeOver(config interface{}, parseDefault bool, parentName string) error {
 				break
 			}
 			if err := parseSlice(v, field); err != nil {
-				return err
+				return field, err
 			}
 
 		case reflect.Struct:
 			pref := strings.ToUpper(parentName + "_" + structName)
-			if err := rangeOver(field, parseDefault, pref); err != nil {
-				return err
+			if findKey {
+				pref = structName
+				if parentName != "" {
+					pref = parentName + "." + structName
+				}
+			}
+			if v, err := rangeOver(field, parseDefault, findKey, pref, findName); err != nil {
+				return field, err
+			} else {
+				return v, nil
 			}
 
 		}
+
 	}
-	return nil
+	return reflect.Value{}, nil
 }
 
 // note Parse function will overwrite the existing value if there is a
@@ -228,7 +248,8 @@ func Parse(config interface{}, prefix ...string) error {
 	if prefix == nil {
 		prefix = []string{"ECP"}
 	}
-	return rangeOver(config, false, prefix[0])
+	_, err := rangeOver(config, false, false, prefix[0], "")
+	return err
 }
 
 // the default value of the config is set by a tag named "default"
@@ -249,7 +270,8 @@ func Parse(config interface{}, prefix ...string) error {
 
 // Default set config with its default value
 func Default(config interface{}) error {
-	return rangeOver(config, true, "")
+	_, err := rangeOver(config, true, false, "", "")
+	return err
 }
 
 // List function will also fill up the value of the envitonment key
@@ -285,4 +307,88 @@ func List(config interface{}, prefix ...string) []string {
 	}
 
 	return list
+}
+
+// Get the value of the keyName in that struct
+func getValue(config interface{}, keyName string) (reflect.Value, error) {
+	v, err := rangeOver(config, false, true, "", keyName)
+	if err != nil {
+		return reflect.Value{}, err
+	}
+
+	if !v.IsValid() {
+		return reflect.Value{}, fmt.Errorf("invalid type")
+	}
+	return v, err
+}
+
+// Get the value of the keyName in that struct
+func Get(config interface{}, keyName string) (interface{}, error) {
+	v, err := getValue(config, keyName)
+	if err != nil {
+		return nil, err
+	}
+
+	return v.Interface(), nil
+}
+
+// GetBool returns bool
+func GetBool(config interface{}, keyName string) (bool, error) {
+	v, err := getValue(config, keyName)
+	if err != nil {
+		return false, err
+	}
+
+	if vv, ok := v.Interface().(bool); ok {
+		return vv, nil
+	}
+	return false, fmt.Errorf("value is not bool, it's %s", v.Kind())
+}
+
+// GetInt64 returns int64
+func GetInt64(config interface{}, keyName string) (int64, error) {
+	v, err := getValue(config, keyName)
+	if err != nil {
+		return -1, err
+	}
+
+	if vv, ok := v.Interface().(int); ok {
+		return int64(vv), nil
+	}
+	if vv, ok := v.Interface().(int32); ok {
+		return int64(vv), nil
+	}
+	if vv, ok := v.Interface().(int64); ok {
+		return vv, nil
+	}
+	return -1, fmt.Errorf("value is not int64, it's %s", v.Kind())
+}
+
+// GetString returns string
+func GetString(config interface{}, keyName string) (string, error) {
+	v, err := getValue(config, keyName)
+	if err != nil {
+		return "", err
+	}
+
+	if vv, ok := v.Interface().(string); ok {
+		return vv, nil
+	}
+	return "", fmt.Errorf("value is not string, it's %s", v.Kind())
+}
+
+// GetFloat64 returns float64
+func GetFloat64(config interface{}, keyName string) (float64, error) {
+	v, err := getValue(config, keyName)
+	if err != nil {
+		return -1, err
+	}
+
+	if vv, ok := v.Interface().(float32); ok {
+		return float64(vv), nil
+	}
+	if vv, ok := v.Interface().(float64); ok {
+		return vv, nil
+	}
+	return -1, fmt.Errorf("value is not float64, it's %s", v.Kind())
 }

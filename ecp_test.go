@@ -20,6 +20,7 @@ type subConfig struct {
 	Duration    time.Duration `default:"1m"`
 	DurationDay time.Duration `default:"6d"`
 	IgnoreMeToo string        `yaml:"-"`
+	Book        string
 }
 
 type configType struct {
@@ -164,6 +165,54 @@ func TestIgnoreFunc(t *testing.T) {
 	if config1.LogLevel == config2.LogLevel {
 		t.Error("not going to happen")
 	}
+}
+
+func TestGet(t *testing.T) {
+	config := &configType{
+		LogLevel: "debug",
+		Port:     999,
+		Sub: subConfig{
+			Bool: true,
+			Book: "1982",
+			F64:  2.987,
+		},
+	}
+
+	// int
+	p, err := GetInt64(config, "port")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p != 999 {
+		t.Fatal("!=999")
+	}
+
+	// string
+	s, err := GetString(config, "sub.Book")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s != "1982" {
+		t.Fatal("!=1982")
+	}
+
+	// bool
+	b, err := GetBool(config, "sub.Bool")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !b {
+		t.Fatal("not true")
+	}
+
+	f, err := GetFloat64(config, "sub.F64")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if f != 2.987 {
+		t.Fatal("not true")
+	}
+
 }
 
 func ExampleParse() {
