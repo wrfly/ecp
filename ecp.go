@@ -103,7 +103,8 @@ func parseSlice(v string, field reflect.Value) error {
 	return nil
 }
 
-func rangeOver(config interface{}, parseDefault, findKey bool, parentName, findName string) (reflect.Value, error) {
+func rangeOver(config interface{}, parseDefault,
+	findKey bool, parentName, findName string) (reflect.Value, error) {
 	configValue := toValue(config)
 	configType := configValue.Type()
 	for i := 0; i < configValue.NumField(); i++ {
@@ -146,13 +147,13 @@ func rangeOver(config interface{}, parseDefault, findKey bool, parentName, findN
 		switch kind {
 		case reflect.String:
 			if field.String() != "" && !exist {
-				break
+				continue
 			}
 			field.SetString(v)
 
 		case reflect.Float32, reflect.Float64:
 			if field.Float() != 0 && !exist {
-				break
+				continue
 			}
 			f, err := strconv.ParseFloat(v, 64)
 			if err != nil {
@@ -163,7 +164,7 @@ func rangeOver(config interface{}, parseDefault, findKey bool, parentName, findN
 		case reflect.Int, reflect.Int8,
 			reflect.Int16, reflect.Int32, reflect.Int64:
 			if field.Int() != 0 && !exist {
-				break
+				continue
 			}
 			// since duration is int64 too, parse it first
 			// if the duration contains `d` (day), we should support it
@@ -180,7 +181,7 @@ func rangeOver(config interface{}, parseDefault, findKey bool, parentName, findN
 			d, err := time.ParseDuration(v)
 			if err == nil {
 				field.SetInt(int64(d))
-				break
+				continue
 			}
 			vint, err := strconv.Atoi(v)
 			if err != nil {
@@ -191,7 +192,7 @@ func rangeOver(config interface{}, parseDefault, findKey bool, parentName, findN
 		case reflect.Uint, reflect.Uint8,
 			reflect.Uint16, reflect.Uint32, reflect.Uint64:
 			if field.Uint() != 0 && !exist {
-				break
+				continue
 			}
 			vint, err := strconv.ParseUint(v, 10, 64)
 			if err != nil {
@@ -205,13 +206,13 @@ func rangeOver(config interface{}, parseDefault, findKey bool, parentName, findN
 				return field, err
 			}
 			if !exist && field.Bool() != b {
-				break
+				continue
 			}
 			field.SetBool(b)
 
 		case reflect.Slice:
 			if !field.IsNil() && !exist {
-				break
+				continue
 			}
 			if err := parseSlice(v, field); err != nil {
 				return field, err
@@ -225,10 +226,13 @@ func rangeOver(config interface{}, parseDefault, findKey bool, parentName, findN
 					pref = parentName + "." + structName
 				}
 			}
-			if v, err := rangeOver(field, parseDefault, findKey, pref, findName); err != nil {
+			v, err := rangeOver(field, parseDefault, findKey, pref, findName)
+			if err != nil {
 				return field, err
-			} else {
+			} else if findKey {
 				return v, nil
+			} else {
+				field = v
 			}
 
 		}
@@ -317,7 +321,7 @@ func getValue(config interface{}, keyName string) (reflect.Value, error) {
 	}
 
 	if !v.IsValid() {
-		return reflect.Value{}, fmt.Errorf("invalid type")
+		return reflect.Value{}, fmt.Errorf("invalid type %v", v)
 	}
 	return v, err
 }

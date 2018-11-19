@@ -30,6 +30,13 @@ type configType struct {
 	SliceInt []int     `env:"INT_SLICE" default:"-1 -2 -3"`
 	Sub      subConfig `yaml:"sub"`
 	// the default value will not work since the ignote `-`
+	SubStruct struct {
+		Str       string `default:"skrskr"`
+		Int       int64  `default:"111"`
+		SubStruct struct {
+			Bool bool `default:"true"`
+		}
+	}
 	IgnoreMe string `yaml:"-" default:"ignore me"`
 }
 
@@ -76,13 +83,8 @@ func TestParse(t *testing.T) {
 		"ECP_SUB_DURATION": "10s",
 	}
 
-	t.Log("set environment")
 	for k, v := range envs {
 		os.Setenv(k, v)
-		if strings.Contains(v, " ") {
-			v = fmt.Sprintf("\"%s\"", v)
-		}
-		t.Logf("export %s=%s", k, v)
 	}
 
 	config := configType{
@@ -92,10 +94,13 @@ func TestParse(t *testing.T) {
 	if err := Parse(&config); err != nil {
 		t.Error(err)
 	}
+	// check
 	if config.Sub.Duration != time.Second*10 {
 		t.Error("parse time duration failed")
 	}
-	t.Logf("%+v", config)
+	if config.Sub.Uint != 123456789 {
+		t.Error("parse uint failed")
+	}
 }
 
 func TestDefault(t *testing.T) {
@@ -104,9 +109,19 @@ func TestDefault(t *testing.T) {
 		Port:     999,
 	}
 	if err := Default(&config); err != nil {
-		t.Error(err)
+		t.Errorf("set default error: %s", err)
 	}
-	t.Logf("%+v", config)
+
+	switch {
+	case config.LogLevel != "debug":
+	case config.SliceStr[0] != "aa":
+	case config.Sub.F != 3.14:
+	case config.SubStruct.Int != 111:
+	default:
+		return
+	}
+
+	t.Errorf("%+v", config)
 }
 
 func TestGetKeyLookupValue(t *testing.T) {
@@ -176,6 +191,20 @@ func TestGet(t *testing.T) {
 			Book: "1982",
 			F64:  2.987,
 		},
+		SubStruct: struct {
+			Str       string `default:"skrskr"`
+			Int       int64  `default:"111"`
+			SubStruct struct {
+				Bool bool `default:"true"`
+			}
+		}{
+			Str: "skrskr",
+			SubStruct: struct {
+				Bool bool `default:"true"`
+			}{
+				Bool: true,
+			},
+		},
 	}
 
 	// int
@@ -205,11 +234,28 @@ func TestGet(t *testing.T) {
 		t.Fatal("not true")
 	}
 
+	// float
 	f, err := GetFloat64(config, "sub.F64")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if f != 2.987 {
+		t.Fatal("not true")
+	}
+
+	// sub.sub
+	subBool, err := GetBool(config, "SubStruct.SubStruct.Bool")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !subBool {
+		t.Fatal("not true")
+	}
+	subStr, err := GetString(config, "SubStruct.Str")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if subStr != "skrskr" {
 		t.Fatal("not true")
 	}
 
