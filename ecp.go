@@ -140,9 +140,10 @@ func rangeOver(config interface{}, parseDefault,
 		}
 
 		kind := field.Kind()
-		if v == "" && kind != reflect.Struct && (parentName == "" && findKey) {
+		if v == "" && kind != reflect.Struct {
 			continue
 		}
+
 
 		switch kind {
 		case reflect.String:
@@ -170,7 +171,7 @@ func rangeOver(config interface{}, parseDefault,
 			// if the duration contains `d` (day), we should support it
 			// fix #6
 			last := len(v) - 1
-			if v[last] == 'd' {
+			if last > 0 && v[last] == 'd' {
 				day := v[:last]
 				dayN, err := strconv.Atoi(day)
 				if err != nil {
