@@ -85,6 +85,7 @@ func TestParse(t *testing.T) {
 
 	for k, v := range envs {
 		os.Setenv(k, v)
+		defer os.Unsetenv(k)
 	}
 
 	config := configType{
@@ -155,7 +156,7 @@ func TestGetKeyLookupValue(t *testing.T) {
 
 func TestIgnoreFunc(t *testing.T) {
 	config1 := configType{}
-	if err := Parse(&config1); err != nil {
+	if err := Default(&config1); err != nil {
 		t.Error(err)
 	}
 
@@ -169,7 +170,7 @@ func TestIgnoreFunc(t *testing.T) {
 		}
 		return true
 	}
-	if err := Parse(&config2); err != nil {
+	if err := Default(&config2); err != nil {
 		t.Fatal(err)
 	}
 

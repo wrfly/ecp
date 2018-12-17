@@ -131,7 +131,7 @@ func rangeOver(config interface{}, parseDefault,
 		}
 
 		v, exist := LookupValue(field, keyName)
-		if parseDefault || !exist {
+		if parseDefault && !exist {
 			v = defaultV
 		}
 
