@@ -219,7 +219,7 @@ func rangeOver(config interface{}, parseDefault,
 			}
 
 		case reflect.Struct:
-			pref := strings.ToUpper(parentName + "_" + structName)
+			pref := parentName + "_" + structName
 			if findKey {
 				pref = structName
 				if parentName != "" {
