@@ -235,6 +235,49 @@ func rangeOver(config interface{}, parseDefault,
 				field = v
 			}
 
+		case reflect.Ptr:
+			// only set default value to nil pointer
+			if field.Pointer() != 0 {
+				continue
+			}
+			var defaultValue interface{}
+			typeString := field.Type().String()[1:]
+			switch typeString {
+			case reflect.String.String():
+				defaultValue = &defaultV
+
+			case reflect.Int.String(), reflect.Int8.String(), reflect.Int16.String(),
+				reflect.Int32.String(), reflect.Int64.String():
+				vInt, err := strconv.ParseInt(defaultV, 10, 64)
+				if err != nil {
+					return field, fmt.Errorf("convert %s error: %s", keyName, err)
+				}
+				switch typeString {
+				case reflect.Int.String():
+					_int := int(vInt)
+					defaultValue = &_int
+				case reflect.Int8.String():
+					_int8 := int8(vInt)
+					defaultValue = &_int8
+				case reflect.Int16.String():
+					_int16 := int16(vInt)
+					defaultValue = &_int16
+				case reflect.Int32.String():
+					_int32 := int32(vInt)
+					defaultValue = &_int32
+				case reflect.Int64.String():
+					defaultValue = &vInt
+				}
+
+			case reflect.Bool.String():
+				b, err := strconv.ParseBool(strings.ToLower(v))
+				if err != nil {
+					return field, err
+				}
+				defaultValue = &b
+			}
+
+			field.Set(reflect.ValueOf(defaultValue))
 		}
 
 	}

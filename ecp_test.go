@@ -10,17 +10,18 @@ import (
 )
 
 type subConfig struct {
-	Bool        bool          `default:"true"`
-	Int64       int64         `default:"666664"`
-	Int         int           `default:"-1"`
-	Uint        uint          `default:"1"`
-	F           float32       `default:"3.14"`
-	FloatSlice  []float32     `default:"1.1 2.2 3.3"`
-	F64         float64       `default:"3.15"`
-	Duration    time.Duration `default:"1m"`
-	DurationDay time.Duration `default:"6d"`
-	IgnoreMeToo string        `yaml:"-"`
-	Book        string
+	Bool         bool          `default:"true"`
+	Int64        int64         `default:"666664"`
+	Int          int           `default:"-1"`
+	Uint         uint          `default:"1"`
+	F            float32       `default:"3.14"`
+	FloatSlice   []float32     `default:"1.1 2.2 3.3"`
+	Float64Slice []float64     `default:"1.1 2.2 3.3"`
+	F64          float64       `default:"3.15"`
+	Duration     time.Duration `default:"1m"`
+	DurationDay  time.Duration `default:"6d"`
+	IgnoreMeToo  string        `yaml:"-"`
+	Book         string
 }
 
 type configType struct {
@@ -38,6 +39,15 @@ type configType struct {
 		}
 	}
 	IgnoreMe string `yaml:"-" default:"ignore me"`
+
+	// should not parse this field when it's a nil pointer
+	Nil      *string `default:"nil"`
+	NilInt   *int    `default:"1"`
+	NilInt8  *int8   `default:"8"`
+	NilInt16 *int16  `default:"16"`
+	NilInt32 *int32  `default:"32"`
+	NilInt64 *int64  `default:"64"`
+	NilBool  *bool   `default:"true"`
 }
 
 func TestList(t *testing.T) {
@@ -105,24 +115,55 @@ func TestParse(t *testing.T) {
 }
 
 func TestDefault(t *testing.T) {
+	empty := ""
+	_int8 := int8(8)
+	_bool := true
+
 	config := configType{
 		LogLevel: "debug",
 		Port:     999,
+		Nil:      &empty,
+		NilInt8:  &_int8,
+		NilBool:  &_bool,
 	}
 	if err := Default(&config); err != nil {
 		t.Errorf("set default error: %s", err)
 	}
 
+	var passed bool
 	switch {
 	case config.LogLevel != "debug":
 	case config.SliceStr[0] != "aa":
 	case config.Sub.F != 3.14:
 	case config.SubStruct.Int != 111:
+	case *config.Nil != "":
 	default:
-		return
+		passed = true
+	}
+	if !passed {
+		t.Errorf("%+v", config)
 	}
 
-	t.Errorf("%+v", config)
+	// test pointers
+	config.Nil = nil
+	config.NilBool = nil
+	if err := Default(&config); err != nil {
+		t.Errorf("set default error: %s", err)
+	}
+	if config.Nil == nil {
+		t.Errorf("config.Nil is nil pointer")
+	} else {
+		if *config.Nil != "nil" {
+			t.Errorf("config.Nil != `nil`")
+		}
+	}
+	if config.NilBool == nil {
+		t.Errorf("config.NilBool is nil pointer")
+	} else {
+		if !*config.NilBool {
+			t.Errorf("config.NilBool != true ")
+		}
+	}
 }
 
 func TestGetKeyLookupValue(t *testing.T) {
