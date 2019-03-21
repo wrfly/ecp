@@ -48,11 +48,11 @@ func toValue(config interface{}) reflect.Value {
 
 func getAll(configType reflect.Type, configValue reflect.Value,
 	i int, parentName string) (field reflect.Value, structName string,
-	keyName string, defaultV string) {
+	keyName string, defaultV string, tag reflect.StructTag) {
 
 	field = configValue.Field(i)
 	structName = configType.Field(i).Name
-	tag := configType.Field(i).Tag
+	tag = configType.Field(i).Tag
 
 	// config often use yaml, so I use yaml
 	if y := tag.Get("yaml"); y != "" {
@@ -108,7 +108,7 @@ func rangeOver(config interface{}, parseDefault,
 	configValue := toValue(config)
 	configType := configValue.Type()
 	for i := 0; i < configValue.NumField(); i++ {
-		field, structName, keyName, defaultV := getAll(configType, configValue, i, parentName)
+		field, structName, keyName, defaultV, tag := getAll(configType, configValue, i, parentName)
 
 		if findKey {
 			pName := ""
@@ -219,7 +219,7 @@ func rangeOver(config interface{}, parseDefault,
 			}
 
 		case reflect.Struct:
-			pref := parentName + "_" + structName
+			pref := GetKey(parentName, structName, tag)
 			if findKey {
 				pref = structName
 				if parentName != "" {
@@ -337,13 +337,13 @@ func List(config interface{}, prefix ...string) []string {
 	configType := configValue.Type()
 	for i := 0; i < configValue.NumField(); i++ {
 		field, structName, keyName,
-			d := getAll(configType, configValue, i, prefix[0])
+			d, tag := getAll(configType, configValue, i, prefix[0])
 		if structName == "-" || keyName == "" {
 			continue
 		}
 		switch field.Kind() {
 		case reflect.Struct:
-			p := GetKey(parentName, structName, "")
+			p := GetKey(parentName, structName, tag)
 			list = append(list, List(field, p)...)
 		default:
 			if strings.Contains(d, " ") {
