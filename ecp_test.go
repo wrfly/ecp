@@ -48,6 +48,11 @@ type configType struct {
 	NilInt32 *int32  `default:"32"`
 	NilInt64 *int64  `default:"64"`
 	NilBool  *bool   `default:"true"`
+
+	// ignore unexported fields
+	x struct {
+		X int
+	}
 }
 
 func TestList(t *testing.T) {

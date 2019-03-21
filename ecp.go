@@ -135,7 +135,7 @@ func rangeOver(config interface{}, parseDefault,
 			v = defaultV
 		}
 
-		if !field.CanAddr() {
+		if !field.CanAddr() || !field.CanSet() {
 			continue
 		}
 
