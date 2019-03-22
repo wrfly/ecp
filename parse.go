@@ -183,65 +183,80 @@ func parseSlice(v string, field reflect.Value) error {
 	return nil
 }
 
-func parsePointer(typeString, defaultV string) (interface{}, error) {
-	var defaultValue interface{}
+func parsePointer(typeString, value string) (interface{}, error) {
+	var rValue interface{}
 	switch typeString {
 	case reflect.String.String():
-		defaultValue = &defaultV
+		rValue = &value
 
 	case reflect.Int.String(), reflect.Int8.String(), reflect.Int16.String(),
 		reflect.Int32.String(), reflect.Int64.String():
-		vInt, err := strconv.ParseInt(defaultV, 10, 64)
+		vInt, err := strconv.ParseInt(value, 10, 64)
 		if err != nil {
 			return nil, err
 		}
 		switch typeString {
 		case reflect.Int.String():
 			parsed := int(vInt)
-			defaultValue = &parsed
+			rValue = &parsed
 		case reflect.Int8.String():
 			parsed := int8(vInt)
-			defaultValue = &parsed
+			rValue = &parsed
 		case reflect.Int16.String():
 			parsed := int16(vInt)
-			defaultValue = &parsed
+			rValue = &parsed
 		case reflect.Int32.String():
 			parsed := int32(vInt)
-			defaultValue = &parsed
+			rValue = &parsed
 		case reflect.Int64.String():
-			defaultValue = &vInt
+			rValue = &vInt
 		}
 
 	case reflect.Uint.String(), reflect.Uint8.String(), reflect.Uint16.String(),
 		reflect.Uint32.String(), reflect.Uint64.String():
-		v, err := strconv.ParseUint(defaultV, 10, 64)
+		v, err := strconv.ParseUint(value, 10, 64)
 		if err != nil {
 			return nil, err
 		}
 		switch typeString {
 		case reflect.Uint.String():
 			parsed := uint(v)
-			defaultValue = &parsed
+			rValue = &parsed
 		case reflect.Uint8.String():
 			parsed := uint8(v)
-			defaultValue = &parsed
+			rValue = &parsed
 		case reflect.Uint16.String():
 			parsed := uint16(v)
-			defaultValue = &parsed
+			rValue = &parsed
 		case reflect.Uint32.String():
 			parsed := uint32(v)
-			defaultValue = &parsed
+			rValue = &parsed
 		case reflect.Uint64.String():
-			defaultValue = &v
+			rValue = &v
 		}
 
 	case reflect.Bool.String():
-		if b, err := strconv.ParseBool(strings.ToLower(defaultV)); err == nil {
-			defaultValue = &b
+		if b, err := strconv.ParseBool(strings.ToLower(value)); err == nil {
+			rValue = &b
 		} else {
 			return nil, err
 		}
+
+	case reflect.Float32.String():
+		v, err := strconv.ParseFloat(value, 32)
+		if err != nil {
+			return nil, err
+		}
+		x := float32(v)
+		rValue = &x
+
+	case reflect.Float64.String():
+		v, err := strconv.ParseFloat(value, 64)
+		if err != nil {
+			return nil, err
+		}
+		rValue = &v
 	}
 
-	return defaultValue, nil
+	return rValue, nil
 }

@@ -199,7 +199,7 @@ func rangeOver(opts roOption) (reflect.Value, error) {
 
 		case reflect.Ptr:
 			// only set default value to nil pointer
-			if field.Pointer() != 0 {
+			if !field.IsNil() {
 				continue
 			}
 			typeString := field.Type().String()[1:]
@@ -207,8 +207,9 @@ func rangeOver(opts roOption) (reflect.Value, error) {
 			if err != nil {
 				return field, fmt.Errorf("convert %s error: %s", keyName, err)
 			}
-
-			field.Set(reflect.ValueOf(value))
+			if value != nil {
+				field.Set(reflect.ValueOf(value))
+			}
 		}
 
 	}

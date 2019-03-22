@@ -82,10 +82,15 @@ type configType struct {
 	NilInt64 *int64 `default:"64"`
 
 	NilUInt   *uint   `default:"1"`
-	NilUInt8  *uint8  `default:"8"`
-	NilUInt16 *uint16 `default:"16"`
+	NilUInt8  *uint8  `default:"88"`
+	NilUInt16 *uint16 `default:"168"`
 	NilUInt32 *uint32 `default:"32"`
 	NilUInt64 *uint64 `default:"64"`
+
+	PointerFloat   *float32 `default:"1.2"`
+	PointerFloat64 *float64 `default:"4.3"`
+
+	Empty string `json:"empty"`
 
 	// ignore unexposed fields
 	x struct {
@@ -149,6 +154,10 @@ func TestParse(t *testing.T) {
 		LogLevel: "debug",
 		Port:     999,
 	}
+
+	six := int8(6)
+	config.NilInt8 = &six
+
 	if err := Parse(&config); err != nil {
 		t.Error(err)
 	}
@@ -162,10 +171,16 @@ func TestParse(t *testing.T) {
 	if config.NilInt8 == nil {
 		t.Error("parse pointer failed")
 	}
-	if *config.NilInt8 != 8 {
+
+	if *config.NilInt8 != 6 {
 		t.Error("???")
 	}
+
 	if *config.NilInt16 != 16 {
+		t.Error("???")
+	}
+
+	if *config.PointerFloat64 != 4.3 {
 		t.Error("???")
 	}
 }
@@ -193,6 +208,8 @@ func TestDefault(t *testing.T) {
 	case config.Sub.F32 != 3.14:
 	case config.SubStruct.Int != 111:
 	case *config.Nil != "":
+	case *config.NilInt64 != 64:
+	case *config.NilInt8 != 8:
 	default:
 		passed = true
 	}
