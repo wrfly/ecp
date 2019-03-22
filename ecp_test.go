@@ -10,27 +10,56 @@ import (
 )
 
 type subConfig struct {
-	Bool         bool          `default:"true"`
-	Int64        int64         `default:"666664"`
-	Int          int           `default:"-1"`
-	Uint         uint          `default:"1"`
-	F            float32       `default:"3.14"`
-	FloatSlice   []float32     `default:"1.1 2.2 3.3"`
-	Float64Slice []float64     `default:"1.1 2.2 3.3"`
-	F64          float64       `default:"3.15"`
-	Duration     time.Duration `default:"1m"`
-	DurationDay  time.Duration `default:"6d"`
-	IgnoreMeToo  string        `yaml:"-"`
-	Book         string
+	Bool      bool   `default:"true"`
+	BoolSlice []bool `default:"true false true"`
+
+	Book  string   `default:"go-101"`
+	Books []string `default:"golang docker rust"`
+
+	Int        int     `default:"1"`
+	Int8       int8    `default:"8"`
+	Int16      int16   `default:"-16"`
+	Int32      int32   `default:"32"`
+	Int64      int64   `default:"-64"`
+	IntSlice   []int   `default:"1 1 -1"`
+	Int8Slice  []int8  `default:"8 8 -8"`
+	Int16Slice []int16 `default:"-16 16 -16"`
+	Int32Slice []int32 `default:"32 32 -32"`
+	Int64Slice []int64 `default:"-64 64 -64"`
+
+	Uint        uint     `default:"1"`
+	Uint8       uint8    `default:"8"`
+	Uint16      uint16   `default:"16"`
+	Uint32      uint32   `default:"32"`
+	Uint64      uint64   `default:"64"`
+	UintSlice   []uint   `default:"1 1 1 1"`
+	Uint8Slice  []uint8  `default:"8 8 8 8"`
+	Uint16Slice []uint16 `default:"16 16 16 16"`
+	Uint32Slice []uint32 `default:"32 32 32 32"`
+	Uint64Slice []uint64 `default:"64 64 64 64"`
+
+	F32          float32   `default:"3.14"`
+	F64          float64   `default:"3.15"`
+	FloatSlice   []float32 `default:"1.1 2.2 3.3"`
+	Float64Slice []float64 `default:"1.1 2.2 3.3"`
+
+	Duration    time.Duration `default:"1m"`
+	DurationDay time.Duration `default:"6d"`
+
+	IgnoreMeToo string `yaml:"-"`
 }
 
 type configType struct {
-	LogLevel string    `yaml:"log-level" default:"info"`
-	Port     int       `yaml:"port" default:"8080"`
-	SliceStr []string  `env:"STRING_SLICE" default:"aa bb cc"`
-	SliceInt []int     `env:"INT_SLICE" default:"-1 -2 -3"`
-	Sub      subConfig `yaml:"sub"`
-	// the default value will not work since the ignote `-`
+	// basic types
+	LogLevel string   `yaml:"log-level" default:"info"`
+	Port     int      `yaml:"port" default:"8080"`
+	SliceStr []string `env:"STRING_SLICE" default:"aa bb cc"`
+	SliceInt []int    `env:"INT_SLICE" default:"-1 -2 -3"`
+
+	// sub type
+	Sub subConfig `yaml:"sub"`
+
+	// sub struct type
 	SubStruct struct {
 		Str       string `default:"skrskr"`
 		Int       int64  `default:"111"`
@@ -38,6 +67,8 @@ type configType struct {
 			Bool bool `default:"true"`
 		}
 	}
+
+	// the default value will not work since the ignore `-`
 	IgnoreMe string `yaml:"-" default:"ignore me"`
 
 	// should not parse this field when it's a nil pointer
@@ -49,7 +80,7 @@ type configType struct {
 	NilInt64 *int64  `default:"64"`
 	NilBool  *bool   `default:"true"`
 
-	// ignore unexported fields
+	// ignore unexposed fields
 	x struct {
 		X int
 	}
@@ -61,15 +92,15 @@ func TestList(t *testing.T) {
 	}
 	t.Run("list with empty prefix", func(t *testing.T) {
 		list := List(config)
-		for _, key := range list {
-			t.Logf("%s\n", key)
+		for _, key := range list[:9] {
+			fmt.Printf("%s\n", key)
 		}
 	})
 
 	t.Run("list with user defined prefix", func(t *testing.T) {
 		list := List(config, "PPPPREFIX")
-		for _, key := range list {
-			t.Logf("%s\n", key)
+		for _, key := range list[9:18] {
+			fmt.Printf("%s\n", key)
 		}
 	})
 
@@ -78,16 +109,17 @@ func TestList(t *testing.T) {
 			return strings.ToLower(parentName) + "." + strings.ToLower(structName)
 		}
 		list := List(config)
-		for _, key := range list {
-			t.Logf("%s\n", key)
+		for _, key := range list[18:27] {
+			fmt.Printf("%s\n", key)
 		}
 
-		GetKey = EnvGetKey
+		// reset get key function
+		GetKey = getKeyFromEnv
 	})
 }
 
 func TestParse(t *testing.T) {
-	envs := map[string]string{
+	ENV := map[string]string{
 		"INT_SLICE":        "1 2 3",
 		"ECP_SUB_INT":      "-2333",
 		"ECP_SUB_BOOL":     "true",
@@ -96,9 +128,10 @@ func TestParse(t *testing.T) {
 		"ECP_SUB_INT64":    "6666",
 		"ECP_LOG-LEVEL":    "info",
 		"ECP_SUB_DURATION": "10s",
+		"ECP_NILINT8":      "",
 	}
 
-	for k, v := range envs {
+	for k, v := range ENV {
 		os.Setenv(k, v)
 		defer os.Unsetenv(k)
 	}
@@ -116,6 +149,9 @@ func TestParse(t *testing.T) {
 	}
 	if config.Sub.Uint != 123456789 {
 		t.Error("parse uint failed")
+	}
+	if config.NilInt8 == nil {
+		t.Error("parse pointer failed")
 	}
 }
 
@@ -139,14 +175,14 @@ func TestDefault(t *testing.T) {
 	switch {
 	case config.LogLevel != "debug":
 	case config.SliceStr[0] != "aa":
-	case config.Sub.F != 3.14:
+	case config.Sub.F32 != 3.14:
 	case config.SubStruct.Int != 111:
 	case *config.Nil != "":
 	default:
 		passed = true
 	}
 	if !passed {
-		t.Errorf("%+v", config)
+		t.Errorf("err config: %+v", config)
 	}
 
 	// test pointers
@@ -183,13 +219,13 @@ func TestGetKeyLookupValue(t *testing.T) {
 		case reflect.String:
 			return "string", true
 		case reflect.Int:
-			return "1", true
-		case reflect.Int64:
-			return "164", true
+			return "-100", true
+		case reflect.Uint32:
+			return "32", true
 		case reflect.Float64:
-			return "2.333", true
+			return "-3.1415", true
 		case reflect.Bool:
-			return "tRuE", true
+			return "True", true
 		}
 		return "", false
 	}
@@ -197,7 +233,15 @@ func TestGetKeyLookupValue(t *testing.T) {
 	if err := Parse(&config); err != nil {
 		t.Error(err)
 	}
-	t.Logf("%+v", config)
+	switch {
+	case config.Port != -100:
+	case config.LogLevel != "string":
+	case config.Sub.Book != "string":
+	case !config.Sub.Bool:
+	default:
+		return
+	}
+	t.Errorf("parse failed, config: %+v", config)
 }
 
 func TestIgnoreFunc(t *testing.T) {
@@ -227,85 +271,6 @@ func TestIgnoreFunc(t *testing.T) {
 	if config1.LogLevel == config2.LogLevel {
 		t.Error("not going to happen")
 	}
-}
-
-func TestGet(t *testing.T) {
-	config := &configType{
-		LogLevel: "debug",
-		Port:     999,
-		Sub: subConfig{
-			Bool: true,
-			Book: "1982",
-			F64:  2.987,
-		},
-		SubStruct: struct {
-			Str       string `default:"skrskr"`
-			Int       int64  `default:"111"`
-			SubStruct struct {
-				Bool bool `default:"true"`
-			}
-		}{
-			Str: "skrskr",
-			SubStruct: struct {
-				Bool bool `default:"true"`
-			}{
-				Bool: true,
-			},
-		},
-	}
-
-	// int
-	p, err := GetInt64(config, "port")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if p != 999 {
-		t.Fatal("!=999")
-	}
-
-	// string
-	s, err := GetString(config, "sub.Book")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if s != "1982" {
-		t.Fatal("!=1982")
-	}
-
-	// bool
-	b, err := GetBool(config, "sub.Bool")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !b {
-		t.Fatal("not true")
-	}
-
-	// float
-	f, err := GetFloat64(config, "sub.F64")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if f != 2.987 {
-		t.Fatal("not true")
-	}
-
-	// sub.sub
-	subBool, err := GetBool(config, "SubStruct.SubStruct.Bool")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !subBool {
-		t.Fatal("not true")
-	}
-	subStr, err := GetString(config, "SubStruct.Str")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if subStr != "skrskr" {
-		t.Fatal("not true")
-	}
-
 }
 
 func ExampleParse() {
