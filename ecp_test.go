@@ -72,13 +72,20 @@ type configType struct {
 	IgnoreMe string `yaml:"-" default:"ignore me"`
 
 	// should not parse this field when it's a nil pointer
-	Nil      *string `default:"nil"`
-	NilInt   *int    `default:"1"`
-	NilInt8  *int8   `default:"8"`
-	NilInt16 *int16  `default:"16"`
-	NilInt32 *int32  `default:"32"`
-	NilInt64 *int64  `default:"64"`
-	NilBool  *bool   `default:"true"`
+	Nil     *string `default:"nil"`
+	NilBool *bool   `default:"true"`
+
+	NilInt   *int   `default:"1"`
+	NilInt8  *int8  `default:"8"`
+	NilInt16 *int16 `default:"16"`
+	NilInt32 *int32 `default:"32"`
+	NilInt64 *int64 `default:"64"`
+
+	NilUInt   *uint   `default:"1"`
+	NilUInt8  *uint8  `default:"8"`
+	NilUInt16 *uint16 `default:"16"`
+	NilUInt32 *uint32 `default:"32"`
+	NilUInt64 *uint64 `default:"64"`
 
 	// ignore unexposed fields
 	x struct {
@@ -128,7 +135,9 @@ func TestParse(t *testing.T) {
 		"ECP_SUB_INT64":    "6666",
 		"ECP_LOG-LEVEL":    "info",
 		"ECP_SUB_DURATION": "10s",
-		"ECP_NILINT8":      "",
+		"ECP_NILINT":       "",
+		"ECP_NILINT8":      "8",
+		"ECP_NILINT16":     "16",
 	}
 
 	for k, v := range ENV {
@@ -152,6 +161,12 @@ func TestParse(t *testing.T) {
 	}
 	if config.NilInt8 == nil {
 		t.Error("parse pointer failed")
+	}
+	if *config.NilInt8 != 8 {
+		t.Error("???")
+	}
+	if *config.NilInt16 != 16 {
+		t.Error("???")
 	}
 }
 

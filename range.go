@@ -166,7 +166,7 @@ func rangeOver(opts roOption) (reflect.Value, error) {
 		case reflect.Bool:
 			parsed, err := strconv.ParseBool(strings.ToLower(v))
 			if err != nil {
-				return field, err
+				return field, fmt.Errorf("convert %s error: %s", keyName, err)
 			}
 			if !exist && field.Bool() != parsed {
 				continue
@@ -178,7 +178,7 @@ func rangeOver(opts roOption) (reflect.Value, error) {
 				continue
 			}
 			if err := parseSlice(v, field); err != nil {
-				return field, err
+				return field, fmt.Errorf("convert %s error: %s", keyName, err)
 			}
 
 		case reflect.Struct:
@@ -194,53 +194,21 @@ func rangeOver(opts roOption) (reflect.Value, error) {
 				return field, err
 			} else if opts.lookup != "" {
 				return v, nil
-			} else {
-				field = v
 			}
+			field = v
 
 		case reflect.Ptr:
 			// only set default value to nil pointer
 			if field.Pointer() != 0 {
 				continue
 			}
-			var defaultValue interface{}
 			typeString := field.Type().String()[1:]
-			switch typeString {
-			case reflect.String.String():
-				defaultValue = &defaultV
-
-			case reflect.Int.String(), reflect.Int8.String(), reflect.Int16.String(),
-				reflect.Int32.String(), reflect.Int64.String():
-				vInt, err := strconv.ParseInt(defaultV, 10, 64)
-				if err != nil {
-					return field, fmt.Errorf("convert %s error: %s", keyName, err)
-				}
-				switch typeString {
-				case reflect.Int.String():
-					parsed := int(vInt)
-					defaultValue = &parsed
-				case reflect.Int8.String():
-					parsed := int8(vInt)
-					defaultValue = &parsed
-				case reflect.Int16.String():
-					parsed := int16(vInt)
-					defaultValue = &parsed
-				case reflect.Int32.String():
-					parsed := int32(vInt)
-					defaultValue = &parsed
-				case reflect.Int64.String():
-					defaultValue = &vInt
-				}
-
-			case reflect.Bool.String():
-				if b, err := strconv.ParseBool(strings.ToLower(v)); err == nil {
-					defaultValue = &b
-				} else {
-					return field, err
-				}
+			value, err := parsePointer(typeString, defaultV)
+			if err != nil {
+				return field, fmt.Errorf("convert %s error: %s", keyName, err)
 			}
 
-			field.Set(reflect.ValueOf(defaultValue))
+			field.Set(reflect.ValueOf(value))
 		}
 
 	}
