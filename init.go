@@ -16,6 +16,9 @@ var (
 		if e := tag.Get("env"); e != "" {
 			return strings.Split(e, ",")[0]
 		}
+		if pName == "" {
+			return strings.ToUpper(sName)
+		}
 		return strings.ToUpper(pName + "_" + sName)
 	}
 	lookupValueFromEnv = func(field reflect.Value, key string) (string, bool) {

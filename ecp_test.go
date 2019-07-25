@@ -16,7 +16,7 @@ type subConfig struct {
 	Book  string   `default:"go-101"`
 	Books []string `default:"golang docker rust"`
 
-	Int        int     `default:"1"`
+	Int        int     `default:"1" env:"int"`
 	Int8       int8    `default:"8"`
 	Int16      int16   `default:"-16"`
 	Int32      int32   `default:"32"`
@@ -245,6 +245,9 @@ func TestGetKeyLookupValue(t *testing.T) {
 	GetKey = func(parentName, structName string, tag reflect.StructTag) (key string) {
 		return parentName + "." + structName
 	}
+	defer func() {
+		GetKey = getKeyFromEnv
+	}()
 
 	LookupValue = func(field reflect.Value, key string) (value string, exist bool) {
 		switch field.Kind() {

@@ -76,9 +76,10 @@ func rangeOver(opts roOption) (reflect.Value, error) {
 		defaultV := all.value
 
 		if opts.lookup != "" {
-			keyName := opts.prefix + "." + structName
 			if opts.prefix == "" {
 				keyName = structName
+			} else {
+				keyName = opts.prefix + "." + structName
 			}
 			if !strings.HasPrefix(opts.lookup, keyName) {
 				continue
