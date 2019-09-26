@@ -68,6 +68,11 @@ type configType struct {
 		}
 	}
 
+	// // pointer struct
+	// PinterStruct *struct {
+	// 	Value string `default:"hey"`
+	// } `yaml:"p"`
+
 	// the default value will not work since the ignore `-`
 	IgnoreMe string `yaml:"-" default:"ignore me"`
 
@@ -140,9 +145,10 @@ func TestParse(t *testing.T) {
 		"ECP_SUB_INT64":    "6666",
 		"ECP_LOG-LEVEL":    "info",
 		"ECP_SUB_DURATION": "10s",
-		"ECP_NILINT":       "",
-		"ECP_NILINT8":      "8",
-		"ECP_NILINT16":     "16",
+		"ECP_NILINT":       "2",
+		"ECP_NILINT8":      "9",
+		"ECP_NILINT16":     "17",
+		// "ECP_P_VALUE":      "yoo",
 	}
 
 	for k, v := range ENV {
@@ -154,9 +160,6 @@ func TestParse(t *testing.T) {
 		LogLevel: "debug",
 		Port:     999,
 	}
-
-	six := int8(6)
-	config.NilInt8 = &six
 
 	if err := Parse(&config); err != nil {
 		t.Error(err)
@@ -172,17 +175,27 @@ func TestParse(t *testing.T) {
 		t.Error("parse pointer failed")
 	}
 
-	if *config.NilInt8 != 6 {
-		t.Error("???")
+	if *config.NilInt != 2 {
+		t.Error("???", *config.NilInt)
 	}
 
-	if *config.NilInt16 != 16 {
-		t.Error("???")
+	if *config.NilInt8 != 9 {
+		t.Error("???", *config.NilInt8)
+	}
+
+	if *config.NilInt16 != 17 {
+		t.Error("???", *config.NilInt16)
 	}
 
 	if *config.PointerFloat64 != 4.3 {
 		t.Error("???")
 	}
+
+	// if config.PinterStruct == nil {
+	// 	t.Error("???")
+	// } else if config.PinterStruct.Value != "yoo" {
+	// 	t.Error("???")
+	// }
 }
 
 func TestDefault(t *testing.T) {

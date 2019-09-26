@@ -6,6 +6,7 @@ import (
 	"strings"
 )
 
+// functions
 var (
 	GetKey      func(parentName, structName string, tag reflect.StructTag) (key string)
 	LookupValue func(field reflect.Value, key string) (value string, exist bool)

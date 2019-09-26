@@ -199,8 +199,8 @@ func rangeOver(opts roOption) (reflect.Value, error) {
 			if !field.IsNil() {
 				continue
 			}
-			typeString := field.Type().String()[1:]
-			value, err := parsePointer(typeString, defaultV)
+			// get pointer real kind
+			value, err := parsePointer(field.Type().Elem(), v)
 			if err != nil {
 				return field, fmt.Errorf("convert %s error: %s", keyName, err)
 			}

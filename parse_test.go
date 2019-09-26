@@ -40,8 +40,9 @@ func TestParseSlice(t *testing.T) {
 			t.Errorf("parse string slice failed: %v", s.String)
 		}
 
+		s = &slices{}
 		if parseSlice("", v) != nil || len(s.String) != 0 {
-			t.Error("test empty string failed")
+			t.Errorf("test empty string failed: %v", s.String)
 		}
 
 	})
