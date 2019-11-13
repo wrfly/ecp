@@ -161,12 +161,13 @@ func rangeOver(opts roOption) (reflect.Value, error) {
 			field.SetUint(parsed)
 
 		case reflect.Bool:
+			if v == "" {
+				continue
+			}
+
 			parsed, err := strconv.ParseBool(strings.ToLower(v))
 			if err != nil {
 				return field, fmt.Errorf("convert %s error: %s", keyName, err)
-			}
-			if !exist && field.Bool() != parsed {
-				continue
 			}
 			field.SetBool(parsed)
 

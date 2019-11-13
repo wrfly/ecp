@@ -10,7 +10,8 @@ import (
 )
 
 type subConfig struct {
-	Bool      bool   `default:"true"`
+	Bool      bool `default:"true"`
+	Bool2     bool
 	BoolSlice []bool `default:"true false true"`
 
 	Book  string   `default:"go-101"`
@@ -220,6 +221,8 @@ func TestDefault(t *testing.T) {
 	case config.SliceStr[0] != "aa":
 	case config.Sub.F32 != 3.14:
 	case config.SubStruct.Int != 111:
+	case config.Sub.Bool == false:
+	case config.Sub.Bool2 == true:
 	case *config.Nil != "":
 	case *config.NilInt64 != 64:
 	case *config.NilInt8 != 8:
@@ -286,6 +289,7 @@ func TestGetKeyLookupValue(t *testing.T) {
 	case config.LogLevel != "string":
 	case config.Sub.Book != "string":
 	case !config.Sub.Bool:
+	case !config.Sub.Bool2:
 	default:
 		return
 	}
