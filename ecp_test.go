@@ -17,7 +17,7 @@ type subConfig struct {
 	Book  string   `default:"go-101"`
 	Books []string `default:"golang docker rust"`
 
-	Int        int     `default:"1" env:"int"`
+	Int        int     `default:"1e3" env:"int"`
 	Int8       int8    `default:"8"`
 	Int16      int16   `default:"-16"`
 	Int32      int32   `default:"32"`
@@ -217,6 +217,7 @@ func TestDefault(t *testing.T) {
 
 	var passed bool
 	switch {
+	case config.Sub.Int != 1000:
 	case config.LogLevel != "debug":
 	case config.SliceStr[0] != "aa":
 	case config.Sub.F32 != 3.14:

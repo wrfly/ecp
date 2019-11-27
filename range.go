@@ -144,6 +144,10 @@ func rangeOver(opts roOption) (reflect.Value, error) {
 				field.SetInt(int64(d))
 				continue
 			}
+			v, err = parseScientific(v)
+			if err != nil {
+				return field, fmt.Errorf("convert %s error: %s", keyName, err)
+			}
 			parsed, err := strconv.Atoi(v)
 			if err != nil {
 				return field, fmt.Errorf("convert %s error: %s", keyName, err)
@@ -153,6 +157,10 @@ func rangeOver(opts roOption) (reflect.Value, error) {
 		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 			if field.Uint() != 0 && !exist {
 				continue
+			}
+			v, err := parseScientific(v)
+			if err != nil {
+				return field, fmt.Errorf("convert %s error: %s", keyName, err)
 			}
 			parsed, err := strconv.ParseUint(v, 10, 64)
 			if err != nil {
@@ -212,4 +220,32 @@ func rangeOver(opts roOption) (reflect.Value, error) {
 
 	}
 	return reflect.Value{}, nil
+}
+
+func parseScientific(v string) (string, error) {
+	switch {
+	case strings.Contains(v, ","):
+		v = strings.ReplaceAll(v, ",", "")
+	case strings.Contains(v, "e"):
+		v = strings.ReplaceAll(v, "e", "E")
+		fallthrough
+	case strings.Contains(v, "E"):
+		if strings.Count(v, "E") != 1 {
+			return "", fmt.Errorf("bad number %s", v)
+		}
+		index := strings.Index(v, "E")
+		if index+1 == len(v) {
+			return "", fmt.Errorf("bad number %s", v)
+		}
+		result := v[:index]
+		n, err := strconv.Atoi(v[index+1:])
+		if err != nil {
+			return "", err
+		}
+		for i := 0; i < n; i++ {
+			result += "0"
+		}
+		v = result
+	}
+	return v, nil
 }
