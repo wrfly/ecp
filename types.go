@@ -17,6 +17,8 @@ type (
 	LookupKeyFunc func(original, prefix, structName string) string
 )
 
+const space = " "
+
 // default functions
 var (
 	getKeyFromEnv = func(pName, sName string, tag reflect.StructTag) string {
@@ -28,12 +30,9 @@ var (
 		}
 		return strings.ToUpper(pName + "_" + sName)
 	}
-	lookupValueFromEnv = func(field reflect.Value, key string) (string, bool) {
-		return os.LookupEnv(key)
-	}
-	ignoreEnvKey = func(field reflect.Value, key string) bool {
-		return key == "-"
-	}
+	lookupValueFromEnv = func(_ reflect.Value, key string) (string, bool) { return os.LookupEnv(key) }
+	ignoreEnvKey       = func(_ reflect.Value, key string) bool { return key == "-" }
+
 	lookupKey = func(original, prefix, structName string) string {
 		if prefix == "" {
 			return structName

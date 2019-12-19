@@ -183,7 +183,7 @@ func (e *ecp) rangeOver(opts roOption) (reflect.Value, error) {
 			if !field.IsNil() && !exist {
 				continue
 			}
-			if err := parseSlice(v, field); err != nil {
+			if err := e.parseSlice(v, field); err != nil {
 				return field, fmt.Errorf("convert %s error: %s", keyName, err)
 			}
 
@@ -209,7 +209,7 @@ func (e *ecp) rangeOver(opts roOption) (reflect.Value, error) {
 				continue
 			}
 			// get pointer real kind
-			value, err := parsePointer(field.Type().Elem(), v)
+			value, err := e.parsePointer(field.Type().Elem(), v)
 			if err != nil {
 				return field, fmt.Errorf("convert %s error: %s", keyName, err)
 			}

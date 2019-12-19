@@ -30,6 +30,8 @@ func TestParseSlice(t *testing.T) {
 		NotSlice    string
 	}
 
+	var parseSlice = globalEcp.parseSlice
+
 	s := &slices{}
 
 	t.Run("test string", func(t *testing.T) {

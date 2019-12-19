@@ -13,6 +13,8 @@ type ecp struct {
 	LookupValue LookupValueFunc
 	IgnoreKey   IgnoreKeyFunc
 	LookupKey   LookupKeyFunc
+
+	SplitChar string
 }
 
 var globalEcp = &ecp{
@@ -20,6 +22,7 @@ var globalEcp = &ecp{
 	IgnoreKey:   ignoreEnvKey,
 	LookupValue: lookupValueFromEnv,
 	LookupKey:   lookupKey,
+	SplitChar:   space,
 }
 
 // New ecp object
@@ -29,6 +32,7 @@ func New() *ecp {
 		IgnoreKey:   ignoreEnvKey,
 		LookupValue: lookupValueFromEnv,
 		LookupKey:   lookupKey,
+		SplitChar:   space,
 	}
 }
 
