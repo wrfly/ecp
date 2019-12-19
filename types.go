@@ -6,14 +6,19 @@ import (
 	"strings"
 )
 
-// functions
-var (
-	GetKey      func(parentName, structName string, tag reflect.StructTag) (key string)
-	LookupValue func(field reflect.Value, key string) (value string, exist bool)
-	IgnoreKey   func(field reflect.Value, key string) bool
-	LookupKey   func(original, prefix, structName string) string
+type (
+	// GetKeyFunc how to get the key name
+	GetKeyFunc func(parentName, structName string, tag reflect.StructTag) (key string)
+	// LookupValueFunc returns the value and whether exist
+	LookupValueFunc func(field reflect.Value, key string) (value string, exist bool)
+	// IgnoreKeyFunc ignore this key
+	IgnoreKeyFunc func(field reflect.Value, key string) bool
+	// LookupKeyFunc returns the key name
+	LookupKeyFunc func(original, prefix, structName string) string
+)
 
-	// env get functions
+// default functions
+var (
 	getKeyFromEnv = func(pName, sName string, tag reflect.StructTag) string {
 		if e := tag.Get("env"); e != "" {
 			return strings.Split(e, ",")[0]
@@ -36,10 +41,3 @@ var (
 		return prefix + "." + structName
 	}
 )
-
-func init() {
-	GetKey = getKeyFromEnv
-	IgnoreKey = ignoreEnvKey
-	LookupValue = lookupValueFromEnv
-	LookupKey = lookupKey
-}

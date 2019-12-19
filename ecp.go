@@ -8,6 +8,81 @@ import (
 	"strings"
 )
 
+type ecp struct {
+	GetKey      GetKeyFunc
+	LookupValue LookupValueFunc
+	IgnoreKey   IgnoreKeyFunc
+	LookupKey   LookupKeyFunc
+}
+
+var globalEcp = &ecp{
+	GetKey:      getKeyFromEnv,
+	IgnoreKey:   ignoreEnvKey,
+	LookupValue: lookupValueFromEnv,
+	LookupKey:   lookupKey,
+}
+
+// New ecp object
+func New() *ecp {
+	return &ecp{
+		GetKey:      getKeyFromEnv,
+		IgnoreKey:   ignoreEnvKey,
+		LookupValue: lookupValueFromEnv,
+		LookupKey:   lookupKey,
+	}
+}
+
+func (e *ecp) Parse(config interface{}, prefix ...string) error {
+	if prefix == nil {
+		prefix = []string{"ECP"}
+	}
+	_, err := e.rangeOver(roOption{config, true, prefix[0], ""})
+	return err
+}
+
+func (e *ecp) Default(config interface{}) error {
+	_, err := e.rangeOver(roOption{config, true, "", ""})
+	return err
+}
+
+func (e *ecp) List(config interface{}, prefix ...string) []string {
+	list := []string{}
+
+	if prefix == nil {
+		prefix = []string{"ECP"}
+	}
+	parentName := prefix[0]
+
+	configValue := toValue(config)
+	configType := configValue.Type()
+	for index := 0; index < configValue.NumField(); index++ {
+		all := e.getAll(gaOption{configType, configValue, index, parentName})
+		if all.sName == "-" || all.kName == "" {
+			continue
+		}
+		switch all.rValue.Kind() {
+		case reflect.Struct:
+			prefix := e.GetKey(parentName, all.sName, all.rTag)
+			list = append(list, e.List(all.rValue, prefix)...)
+		default:
+			if strings.Contains(all.value, " ") {
+				all.value = fmt.Sprintf("\"%s\"", all.value)
+			}
+			list = append(list, fmt.Sprintf("%s=%s", all.kName, all.value))
+		}
+	}
+
+	return list
+}
+
+// List function will also fill up the value of the environment key
+// it the "default" tag has value
+
+// List all the config environments
+func List(config interface{}, prefix ...string) []string {
+	return globalEcp.List(config, prefix...)
+}
+
 // Parse the configuration through environments starting with the prefix
 // or you can ignore the prefix and the default prefix key will be `ECP`
 // ecp.Parse(&config) or ecp.Parse(&config, "PREFIX")
@@ -22,11 +97,7 @@ import (
 // type, thus Parse will only set the default value when the field is
 // nil, not the zero value.
 func Parse(config interface{}, prefix ...string) error {
-	if prefix == nil {
-		prefix = []string{"ECP"}
-	}
-	_, err := rangeOver(roOption{config, true, prefix[0], ""})
-	return err
+	return globalEcp.Parse(config, prefix...)
 }
 
 // the default value of the config is set by a tag named "default"
@@ -48,40 +119,5 @@ func Parse(config interface{}, prefix ...string) error {
 // Default set config with its default value
 // DEPRECATED: just use `Parse`
 func Default(config interface{}) error {
-	_, err := rangeOver(roOption{config, true, "", ""})
-	return err
-}
-
-// List function will also fill up the value of the environment key
-// it the "default" tag has value
-
-// List all the config environments
-func List(config interface{}, prefix ...string) []string {
-	list := []string{}
-
-	if prefix == nil {
-		prefix = []string{"ECP"}
-	}
-	parentName := prefix[0]
-
-	configValue := toValue(config)
-	configType := configValue.Type()
-	for index := 0; index < configValue.NumField(); index++ {
-		all := getAll(gaOption{configType, configValue, index, parentName})
-		if all.sName == "-" || all.kName == "" {
-			continue
-		}
-		switch all.rValue.Kind() {
-		case reflect.Struct:
-			prefix := GetKey(parentName, all.sName, all.rTag)
-			list = append(list, List(all.rValue, prefix)...)
-		default:
-			if strings.Contains(all.value, " ") {
-				all.value = fmt.Sprintf("\"%s\"", all.value)
-			}
-			list = append(list, fmt.Sprintf("%s=%s", all.kName, all.value))
-		}
-	}
-
-	return list
+	return globalEcp.Default(config)
 }
