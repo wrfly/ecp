@@ -9,7 +9,7 @@ import (
 
 // parseSlice support slice of string, int, int8, int16, int32, int64
 // float32, float64, uint, uint8, uint16, uint32, uint64, bool
-func parseSlice(v string, field reflect.Value) error {
+func (e *ecp) parseSlice(v string, field reflect.Value) error {
 	if v == "" {
 		return nil
 	}
@@ -23,7 +23,7 @@ func parseSlice(v string, field reflect.Value) error {
 
 	// either space nor commas is perfect, but I think space is better
 	// since it's more natural: fmt.Println([]int{1, 2, 3}) = [1 2 3]
-	stringSlice := strings.Split(v, " ") // split by space
+	stringSlice := strings.Split(v, e.SplitChar) // split by space
 
 	field.Set(reflect.MakeSlice(field.Type(), len(stringSlice), cap(stringSlice)))
 
@@ -183,7 +183,7 @@ func parseSlice(v string, field reflect.Value) error {
 	return nil
 }
 
-func parsePointer(typ reflect.Type, value string) (interface{}, error) {
+func (e *ecp) parsePointer(typ reflect.Type, value string) (interface{}, error) {
 	var rValue interface{}
 	switch typ.Kind() {
 	case reflect.String:
@@ -259,7 +259,7 @@ func parsePointer(typ reflect.Type, value string) (interface{}, error) {
 
 	case reflect.Slice:
 		newValue := reflect.New(typ)
-		if err := parseSlice(value, newValue); err != nil {
+		if err := e.parseSlice(value, newValue); err != nil {
 			return rValue, err
 		}
 		rValue = newValue

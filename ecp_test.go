@@ -123,7 +123,7 @@ func TestList(t *testing.T) {
 	})
 
 	t.Run("with get key", func(t *testing.T) {
-		GetKey = func(parentName, structName string, tag reflect.StructTag) (key string) {
+		globalEcp.GetKey = func(parentName, structName string, tag reflect.StructTag) (key string) {
 			return strings.ToLower(parentName) + "." + strings.ToLower(structName)
 		}
 		list := List(config)
@@ -132,7 +132,7 @@ func TestList(t *testing.T) {
 		}
 
 		// reset get key function
-		GetKey = getKeyFromEnv
+		globalEcp.GetKey = getKeyFromEnv
 	})
 }
 
@@ -259,14 +259,14 @@ func TestDefault(t *testing.T) {
 func TestGetKeyLookupValue(t *testing.T) {
 	config := configType{}
 
-	GetKey = func(parentName, structName string, tag reflect.StructTag) (key string) {
+	globalEcp.GetKey = func(parentName, structName string, tag reflect.StructTag) (key string) {
 		return parentName + "." + structName
 	}
 	defer func() {
-		GetKey = getKeyFromEnv
+		globalEcp.GetKey = getKeyFromEnv
 	}()
 
-	LookupValue = func(field reflect.Value, key string) (value string, exist bool) {
+	globalEcp.LookupValue = func(field reflect.Value, key string) (value string, exist bool) {
 		switch field.Kind() {
 		case reflect.String:
 			return "string", true
@@ -304,7 +304,7 @@ func TestIgnoreFunc(t *testing.T) {
 	}
 
 	config2 := configType{}
-	IgnoreKey = func(field reflect.Value, key string) bool {
+	globalEcp.IgnoreKey = func(field reflect.Value, key string) bool {
 		switch field.Kind() {
 		case reflect.Int64, reflect.Int, reflect.Uint:
 		case reflect.String:

@@ -5,8 +5,8 @@ import (
 	"reflect"
 )
 
-func getValue(config interface{}, keyName string) (reflect.Value, error) {
-	v, err := rangeOver(roOption{config, false, "", keyName})
+func (e *ecp) getValue(config interface{}, keyName string) (reflect.Value, error) {
+	v, err := e.rangeOver(roOption{config, false, "", keyName})
 	if err != nil {
 		return reflect.Value{}, err
 	}
@@ -17,9 +17,8 @@ func getValue(config interface{}, keyName string) (reflect.Value, error) {
 	return v, err
 }
 
-// Get the value of the keyName in that struct
-func Get(config interface{}, keyName string) (interface{}, error) {
-	v, err := getValue(config, keyName)
+func (e *ecp) Get(config interface{}, keyName string) (interface{}, error) {
+	v, err := e.getValue(config, keyName)
 	if err != nil {
 		return nil, err
 	}
@@ -27,9 +26,8 @@ func Get(config interface{}, keyName string) (interface{}, error) {
 	return v.Interface(), nil
 }
 
-// GetBool returns bool
-func GetBool(config interface{}, keyName string) (bool, error) {
-	v, err := getValue(config, keyName)
+func (e *ecp) GetBool(config interface{}, keyName string) (bool, error) {
+	v, err := e.getValue(config, keyName)
 	if err != nil {
 		return false, err
 	}
@@ -40,9 +38,8 @@ func GetBool(config interface{}, keyName string) (bool, error) {
 	return false, fmt.Errorf("value is not bool, it's %s", v.Kind())
 }
 
-// GetInt64 returns int64
-func GetInt64(config interface{}, keyName string) (int64, error) {
-	v, err := getValue(config, keyName)
+func (e *ecp) GetInt64(config interface{}, keyName string) (int64, error) {
+	v, err := e.getValue(config, keyName)
 	if err != nil {
 		return -1, err
 	}
@@ -63,9 +60,8 @@ func GetInt64(config interface{}, keyName string) (int64, error) {
 	return -1, fmt.Errorf("value is %s", v.Kind())
 }
 
-// GetString returns string
-func GetString(config interface{}, keyName string) (string, error) {
-	v, err := getValue(config, keyName)
+func (e *ecp) GetString(config interface{}, keyName string) (string, error) {
+	v, err := e.getValue(config, keyName)
 	if err != nil {
 		return "", err
 	}
@@ -76,9 +72,8 @@ func GetString(config interface{}, keyName string) (string, error) {
 	return "", fmt.Errorf("value is not string, it's %s", v.Kind())
 }
 
-// GetFloat64 returns float64
-func GetFloat64(config interface{}, keyName string) (float64, error) {
-	v, err := getValue(config, keyName)
+func (e *ecp) GetFloat64(config interface{}, keyName string) (float64, error) {
+	v, err := e.getValue(config, keyName)
 	if err != nil {
 		return -1, err
 	}
@@ -90,4 +85,29 @@ func GetFloat64(config interface{}, keyName string) (float64, error) {
 		return vv, nil
 	}
 	return -1, fmt.Errorf("value is %s", v.Kind())
+}
+
+// Get the value of the keyName in that struct
+func Get(config interface{}, keyName string) (interface{}, error) {
+	return globalEcp.Get(config, keyName)
+}
+
+// GetBool returns bool
+func GetBool(config interface{}, keyName string) (bool, error) {
+	return globalEcp.GetBool(config, keyName)
+}
+
+// GetInt64 returns int64
+func GetInt64(config interface{}, keyName string) (int64, error) {
+	return globalEcp.GetInt64(config, keyName)
+}
+
+// GetString returns string
+func GetString(config interface{}, keyName string) (string, error) {
+	return globalEcp.GetString(config, keyName)
+}
+
+// GetFloat64 returns float64
+func GetFloat64(config interface{}, keyName string) (float64, error) {
+	return globalEcp.GetFloat64(config, keyName)
 }

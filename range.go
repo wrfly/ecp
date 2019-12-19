@@ -31,7 +31,7 @@ type getAllResult struct {
 	value  string // default value
 }
 
-func getAll(opts gaOption) getAllResult {
+func (e *ecp) getAll(opts gaOption) getAllResult {
 	structField := opts.rType.Field(opts.index)
 
 	r := getAllResult{
@@ -49,7 +49,7 @@ func getAll(opts gaOption) getAllResult {
 		r.sName = strings.Split(v, ",")[0]
 	}
 
-	r.kName = GetKey(opts.pName, r.sName, r.rTag)
+	r.kName = e.GetKey(opts.pName, r.sName, r.rTag)
 
 	return r
 }
@@ -62,21 +62,21 @@ type roOption struct {
 	lookup string // lookup some key
 }
 
-func rangeOver(opts roOption) (reflect.Value, error) {
+func (e *ecp) rangeOver(opts roOption) (reflect.Value, error) {
 
 	rValue := toValue(opts.target)
 	rType := rValue.Type()
 
 	fieldNum := rValue.NumField()
 	for index := 0; index < fieldNum; index++ {
-		all := getAll(gaOption{rType, rValue, index, opts.prefix})
+		all := e.getAll(gaOption{rType, rValue, index, opts.prefix})
 		field := all.rValue
 		structName := all.sName
 		keyName := all.kName
 		defaultV := all.value
 
 		if opts.lookup != "" {
-			keyName = LookupKey(keyName, opts.prefix, structName)
+			keyName = e.LookupKey(keyName, opts.prefix, structName)
 			if !strings.HasPrefix(opts.lookup, keyName) {
 				continue
 			}
@@ -88,11 +88,11 @@ func rangeOver(opts roOption) (reflect.Value, error) {
 		}
 
 		// ignore this key
-		if IgnoreKey(field, structName) || IgnoreKey(field, keyName) {
+		if e.IgnoreKey(field, structName) || e.IgnoreKey(field, keyName) {
 			continue
 		}
 
-		v, exist := LookupValue(field, keyName)
+		v, exist := e.LookupValue(field, keyName)
 		if opts.setDef && !exist {
 			v = defaultV
 		}
@@ -183,19 +183,19 @@ func rangeOver(opts roOption) (reflect.Value, error) {
 			if !field.IsNil() && !exist {
 				continue
 			}
-			if err := parseSlice(v, field); err != nil {
+			if err := e.parseSlice(v, field); err != nil {
 				return field, fmt.Errorf("convert %s error: %s", keyName, err)
 			}
 
 		case reflect.Struct:
-			prefix := GetKey(opts.prefix, structName, all.rTag)
+			prefix := e.GetKey(opts.prefix, structName, all.rTag)
 			if opts.lookup != "" {
 				prefix = structName
 				if opts.prefix != "" {
 					prefix = opts.prefix + "." + structName
 				}
 			}
-			v, err := rangeOver(roOption{field, opts.setDef, prefix, opts.lookup})
+			v, err := e.rangeOver(roOption{field, opts.setDef, prefix, opts.lookup})
 			if err != nil {
 				return field, err
 			} else if opts.lookup != "" {
@@ -209,7 +209,7 @@ func rangeOver(opts roOption) (reflect.Value, error) {
 				continue
 			}
 			// get pointer real kind
-			value, err := parsePointer(field.Type().Elem(), v)
+			value, err := e.parsePointer(field.Type().Elem(), v)
 			if err != nil {
 				return field, fmt.Errorf("convert %s error: %s", keyName, err)
 			}
