@@ -27,14 +27,12 @@ func (e *ecp) parseSlice(v string, field reflect.Value) error {
 
 	field.Set(reflect.MakeSlice(field.Type(), len(stringSlice), cap(stringSlice)))
 
-	kind := field.Type().Elem().Kind()
-
-	switch kind {
+	switch field.Type().Elem().Kind() {
 	case reflect.String:
 		field.Set(reflect.ValueOf(stringSlice))
 
 	case reflect.Int:
-		slice := []int{}
+		slice := make([]int, 0, len(stringSlice))
 		for _, s := range stringSlice {
 			i, err := strconv.ParseInt(s, 10, 64)
 			if err != nil {
@@ -45,7 +43,7 @@ func (e *ecp) parseSlice(v string, field reflect.Value) error {
 		field.Set(reflect.ValueOf(slice))
 
 	case reflect.Int8:
-		slice := []int8{}
+		slice := make([]int8, 0, len(stringSlice))
 		for _, s := range stringSlice {
 			i, err := strconv.ParseInt(s, 10, 8)
 			if err != nil {
@@ -56,7 +54,7 @@ func (e *ecp) parseSlice(v string, field reflect.Value) error {
 		field.Set(reflect.ValueOf(slice))
 
 	case reflect.Int16:
-		slice := []int16{}
+		slice := make([]int16, 0, len(stringSlice))
 		for _, s := range stringSlice {
 			i, err := strconv.ParseInt(s, 10, 16)
 			if err != nil {
@@ -67,7 +65,7 @@ func (e *ecp) parseSlice(v string, field reflect.Value) error {
 		field.Set(reflect.ValueOf(slice))
 
 	case reflect.Int32:
-		slice := []int32{}
+		slice := make([]int32, 0, len(stringSlice))
 		for _, s := range stringSlice {
 			i, err := strconv.ParseInt(s, 10, 32)
 			if err != nil {
@@ -78,7 +76,7 @@ func (e *ecp) parseSlice(v string, field reflect.Value) error {
 		field.Set(reflect.ValueOf(slice))
 
 	case reflect.Int64:
-		slice := []int64{}
+		slice := make([]int64, 0, len(stringSlice))
 		for _, s := range stringSlice {
 			i, err := strconv.ParseInt(s, 10, 64)
 			if err != nil {
@@ -89,7 +87,7 @@ func (e *ecp) parseSlice(v string, field reflect.Value) error {
 		field.Set(reflect.ValueOf(slice))
 
 	case reflect.Float32:
-		slice := []float32{}
+		slice := make([]float32, 0, len(stringSlice))
 		for _, s := range stringSlice {
 			i, err := strconv.ParseFloat(s, 32)
 			if err != nil {
@@ -100,7 +98,7 @@ func (e *ecp) parseSlice(v string, field reflect.Value) error {
 		field.Set(reflect.ValueOf(slice))
 
 	case reflect.Float64:
-		slice := []float64{}
+		slice := make([]float64, 0, len(stringSlice))
 		for _, s := range stringSlice {
 			i, err := strconv.ParseFloat(s, 64)
 			if err != nil {
@@ -111,7 +109,7 @@ func (e *ecp) parseSlice(v string, field reflect.Value) error {
 		field.Set(reflect.ValueOf(slice))
 
 	case reflect.Uint:
-		slice := []uint{}
+		slice := make([]uint, 0, len(stringSlice))
 		for _, s := range stringSlice {
 			i, err := strconv.ParseUint(s, 10, 64)
 			if err != nil {
@@ -122,7 +120,7 @@ func (e *ecp) parseSlice(v string, field reflect.Value) error {
 		field.Set(reflect.ValueOf(slice))
 
 	case reflect.Uint8:
-		slice := []uint8{}
+		slice := make([]uint8, 0, len(stringSlice))
 		for _, s := range stringSlice {
 			i, err := strconv.ParseUint(s, 10, 8)
 			if err != nil {
@@ -133,7 +131,7 @@ func (e *ecp) parseSlice(v string, field reflect.Value) error {
 		field.Set(reflect.ValueOf(slice))
 
 	case reflect.Uint16:
-		slice := []uint16{}
+		slice := make([]uint16, 0, len(stringSlice))
 		for _, s := range stringSlice {
 			i, err := strconv.ParseUint(s, 10, 16)
 			if err != nil {
@@ -144,7 +142,7 @@ func (e *ecp) parseSlice(v string, field reflect.Value) error {
 		field.Set(reflect.ValueOf(slice))
 
 	case reflect.Uint32:
-		slice := []uint32{}
+		slice := make([]uint32, 0, len(stringSlice))
 		for _, s := range stringSlice {
 			i, err := strconv.ParseUint(s, 10, 32)
 			if err != nil {
@@ -155,7 +153,7 @@ func (e *ecp) parseSlice(v string, field reflect.Value) error {
 		field.Set(reflect.ValueOf(slice))
 
 	case reflect.Uint64:
-		slice := []uint64{}
+		slice := make([]uint64, 0, len(stringSlice))
 		for _, s := range stringSlice {
 			i, err := strconv.ParseUint(s, 10, 64)
 			if err != nil {
@@ -166,9 +164,9 @@ func (e *ecp) parseSlice(v string, field reflect.Value) error {
 		field.Set(reflect.ValueOf(slice))
 
 	case reflect.Bool:
-		slice := []bool{}
+		slice := make([]bool, 0, len(stringSlice))
 		for _, s := range stringSlice {
-			i, err := strconv.ParseBool(strings.ToLower(s))
+			i, err := strconv.ParseBool(s)
 			if err != nil {
 				return err
 			}
@@ -177,7 +175,7 @@ func (e *ecp) parseSlice(v string, field reflect.Value) error {
 		field.Set(reflect.ValueOf(slice))
 
 	default:
-		return fmt.Errorf("unsupported slice kind %s", kind)
+		return fmt.Errorf("unsupported slice kind %s", field.Type().Elem().Kind())
 	}
 
 	return nil

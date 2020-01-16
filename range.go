@@ -41,14 +41,6 @@ func (e *ecp) getAll(opts gaOption) getAllResult {
 		value:  structField.Tag.Get("default"),
 	}
 
-	// support yaml or json
-	if v, exist := r.rTag.Lookup("yaml"); exist {
-		r.sName = strings.Split(v, ",")[0]
-	}
-	if v, exist := r.rTag.Lookup("json"); exist {
-		r.sName = strings.Split(v, ",")[0]
-	}
-
 	r.kName = e.GetKey(opts.pName, r.sName, r.rTag)
 
 	return r
@@ -85,11 +77,6 @@ func (e *ecp) rangeOver(opts roOption) (reflect.Value, error) {
 			} else if index == fieldNum {
 				return field, fmt.Errorf("key %s not found", opts.lookup)
 			}
-		}
-
-		// ignore this key
-		if e.IgnoreKey(field, structName) || e.IgnoreKey(field, keyName) {
-			continue
 		}
 
 		v, exist := e.LookupValue(field, keyName)
@@ -139,15 +126,19 @@ func (e *ecp) rangeOver(opts roOption) (reflect.Value, error) {
 				}
 				v = fmt.Sprintf("%dh", dayN*24)
 			}
-			d, err := time.ParseDuration(v)
-			if err == nil {
-				field.SetInt(int64(d))
-				continue
+
+			// parse time duration
+			if last = len(v) - 1; last > 0 {
+				if v[last] == 's' || v[last] == 'm' || v[last] == 'h' {
+					d, err := time.ParseDuration(v)
+					if err != nil {
+						return field, fmt.Errorf("convert %s error: %s", keyName, err)
+					}
+					field.SetInt(int64(d))
+					continue
+				}
 			}
-			v, err = parseScientific(v)
-			if err != nil {
-				return field, fmt.Errorf("convert %s error: %s", keyName, err)
-			}
+
 			parsed, err := strconv.Atoi(v)
 			if err != nil {
 				return field, fmt.Errorf("convert %s error: %s", keyName, err)
@@ -157,10 +148,6 @@ func (e *ecp) rangeOver(opts roOption) (reflect.Value, error) {
 		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 			if field.Uint() != 0 && !exist {
 				continue
-			}
-			v, err := parseScientific(v)
-			if err != nil {
-				return field, fmt.Errorf("convert %s error: %s", keyName, err)
 			}
 			parsed, err := strconv.ParseUint(v, 10, 64)
 			if err != nil {
@@ -220,32 +207,4 @@ func (e *ecp) rangeOver(opts roOption) (reflect.Value, error) {
 
 	}
 	return reflect.Value{}, nil
-}
-
-func parseScientific(v string) (string, error) {
-	switch {
-	case strings.Contains(v, ","):
-		v = strings.ReplaceAll(v, ",", "")
-	case strings.Contains(v, "e"):
-		v = strings.ReplaceAll(v, "e", "E")
-		fallthrough
-	case strings.Contains(v, "E"):
-		if strings.Count(v, "E") != 1 {
-			return "", fmt.Errorf("bad number %s", v)
-		}
-		index := strings.Index(v, "E")
-		if index+1 == len(v) {
-			return "", fmt.Errorf("bad number %s", v)
-		}
-		result := v[:index]
-		n, err := strconv.Atoi(v[index+1:])
-		if err != nil {
-			return "", err
-		}
-		for i := 0; i < n; i++ {
-			result += "0"
-		}
-		v = result
-	}
-	return v, nil
 }
