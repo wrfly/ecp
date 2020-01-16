@@ -28,7 +28,6 @@ type getAllResult struct {
 	rTag   reflect.StructTag
 	sName  string // struct name
 	kName  string // key name
-	value  string // default value
 }
 
 func (e *ecp) getAll(opts gaOption) getAllResult {
@@ -38,7 +37,6 @@ func (e *ecp) getAll(opts gaOption) getAllResult {
 		rTag:   structField.Tag,
 		rValue: opts.rValue.Field(opts.index),
 		sName:  structField.Name,
-		value:  structField.Tag.Get("default"),
 	}
 
 	r.kName = e.GetKey(opts.pName, r.sName, r.rTag)
@@ -65,7 +63,6 @@ func (e *ecp) rangeOver(opts roOption) (reflect.Value, error) {
 		field := all.rValue
 		structName := all.sName
 		keyName := all.kName
-		defaultV := all.value
 
 		if opts.lookup != "" {
 			keyName = e.LookupKey(keyName, opts.prefix, structName)
@@ -81,7 +78,7 @@ func (e *ecp) rangeOver(opts roOption) (reflect.Value, error) {
 
 		v, exist := e.LookupValue(field, keyName)
 		if opts.setDef && !exist {
-			v = defaultV
+			continue // do not set if value not exist
 		}
 
 		if !field.CanAddr() || !field.CanSet() {

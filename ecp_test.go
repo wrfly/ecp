@@ -1,10 +1,8 @@
 package ecp
 
 import (
-	"fmt"
 	"os"
 	"reflect"
-	"strings"
 	"testing"
 	"time"
 )
@@ -102,38 +100,6 @@ type configType struct {
 	x struct {
 		X int
 	}
-}
-
-func TestList(t *testing.T) {
-	config := configType{
-		LogLevel: "debug",
-	}
-	t.Run("list with empty prefix", func(t *testing.T) {
-		list := List(config)
-		for _, key := range list[:9] {
-			fmt.Printf("%s\n", key)
-		}
-	})
-
-	t.Run("list with user defined prefix", func(t *testing.T) {
-		list := List(config, "PPPPREFIX")
-		for _, key := range list[9:18] {
-			fmt.Printf("%s\n", key)
-		}
-	})
-
-	t.Run("with get key", func(t *testing.T) {
-		globalEcp.GetKey = func(parentName, structName string, tag reflect.StructTag) (key string) {
-			return strings.ToLower(parentName) + "." + strings.ToLower(structName)
-		}
-		list := List(config)
-		for _, key := range list[18:27] {
-			fmt.Printf("%s\n", key)
-		}
-
-		// reset get key function
-		globalEcp.GetKey = getKeyFromEnv
-	})
 }
 
 func TestParse(t *testing.T) {
@@ -341,19 +307,6 @@ func ExampleParse() {
 	if c.Age != 10 {
 		panic("???")
 	}
-}
-
-func ExampleList() {
-	type config struct {
-		Age  int
-		Name string
-	}
-	for _, key := range List(config{}) {
-		fmt.Printf("env %s", key)
-	}
-
-	// env ECP_AGE=
-	// env ECP_NAME=
 }
 
 func ExampleDefault() {
