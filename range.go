@@ -130,16 +130,7 @@ func (e *ecp) rangeOver(opts roOption) (reflect.Value, error) {
 			// since duration is int64 too, parse it first
 			// if the duration contains `d` (day), we should support it
 			// fix #6
-			last := len(v) - 1
-			if last > 0 && v[last] == 'd' {
-				day := v[:last]
-				dayN, err := strconv.Atoi(day)
-				if err != nil {
-					return field, fmt.Errorf("convert %s error: %s", keyName, err)
-				}
-				v = fmt.Sprintf("%dh", dayN*24)
-			}
-			d, err := time.ParseDuration(v)
+			d, err := parseDuration(v)
 			if err == nil {
 				field.SetInt(int64(d))
 				continue
@@ -248,4 +239,23 @@ func parseScientific(v string) (string, error) {
 		v = result
 	}
 	return v, nil
+}
+
+// parseDuration wrapper func of time.ParseDuration to support `Xd` = `X*24h`
+func parseDuration(v string) (time.Duration, error) {
+	last := len(v) - 1
+	if last > 0 && v[last] == 'd' {
+		day := v[:last]
+		dayN, err := strconv.Atoi(day)
+		if err != nil {
+			return 0, err
+		}
+		v = fmt.Sprintf("%dh", dayN*24)
+	}
+	d, err := time.ParseDuration(v)
+	if err != nil {
+		return 0, err
+	}
+
+	return d, nil
 }

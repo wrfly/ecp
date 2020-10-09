@@ -3,6 +3,7 @@ package ecp
 import (
 	"reflect"
 	"testing"
+	"time"
 )
 
 func TestParseSlice(t *testing.T) {
@@ -25,6 +26,8 @@ func TestParseSlice(t *testing.T) {
 		Float32 []float32
 		Float64 []float64
 
+		Times []time.Duration
+
 		Unsupported []*string
 		Pointer     *string
 		NotSlice    string
@@ -33,6 +36,15 @@ func TestParseSlice(t *testing.T) {
 	var parseSlice = globalEcp.parseSlice
 
 	s := &slices{}
+
+	t.Run("test duration", func(t *testing.T) {
+		v := toValue(s).FieldByName("Times")
+		if err := parseSlice("1h 2m 3d", v); err != nil {
+			t.Errorf("parse time slice failed: %v", err)
+		} else if len(s.Times) != 3 || s.Times[0] != time.Hour {
+			t.Errorf("parse time slice failed: %v", s.Times)
+		}
+	})
 
 	t.Run("test string", func(t *testing.T) {
 		v := toValue(s).FieldByName("String")

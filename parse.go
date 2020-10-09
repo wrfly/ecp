@@ -5,10 +5,11 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // parseSlice support slice of string, int, int8, int16, int32, int64
-// float32, float64, uint, uint8, uint16, uint32, uint64, bool
+// float32, float64, uint, uint8, uint16, uint32, uint64, bool and time.Duration
 func (e *ecp) parseSlice(v string, field reflect.Value) error {
 	if v == "" {
 		return nil
@@ -78,15 +79,30 @@ func (e *ecp) parseSlice(v string, field reflect.Value) error {
 		field.Set(reflect.ValueOf(slice))
 
 	case reflect.Int64:
-		slice := []int64{}
-		for _, s := range stringSlice {
-			i, err := strconv.ParseInt(s, 10, 64)
-			if err != nil {
-				return err
+
+		if timeSlice, err := func() ([]time.Duration, error) {
+			timeSlice := make([]time.Duration, 0, len(stringSlice))
+			for _, s := range stringSlice {
+				d, err := parseDuration(s)
+				if err != nil {
+					return nil, err
+				}
+				timeSlice = append(timeSlice, d)
 			}
-			slice = append(slice, i)
+			return timeSlice, nil
+		}(); err == nil {
+			field.Set(reflect.ValueOf(timeSlice))
+		} else {
+			slice := []int64{}
+			for _, s := range stringSlice {
+				i, err := strconv.ParseInt(s, 10, 64)
+				if err != nil {
+					return err
+				}
+				slice = append(slice, i)
+			}
+			field.Set(reflect.ValueOf(slice))
 		}
-		field.Set(reflect.ValueOf(slice))
 
 	case reflect.Float32:
 		slice := []float32{}
