@@ -138,18 +138,18 @@ func TestList(t *testing.T) {
 
 func TestParse(t *testing.T) {
 	ENV := map[string]string{
-		"INT_SLICE":        "1 2 3",
-		"ECP_SUB_INT":      "-2333",
-		"ECP_SUB_BOOL":     "true",
-		"STRING_SLICE":     "a b c",
-		"ECP_SUB_UINT":     "123456789",
-		"ECP_SUB_INT64":    "6666",
-		"ECP_LOG-LEVEL":    "info",
-		"ECP_SUB_DURATION": "10s",
-		"ECP_NILINT":       "2",
-		"ECP_NILINT8":      "9",
-		"ECP_NILINT16":     "17",
-		// "ECP_P_VALUE":      "yoo",
+		"INT_SLICE":    "1 2 3",
+		"SUB_INT":      "-2333",
+		"SUB_BOOL":     "true",
+		"STRING_SLICE": "a b c",
+		"SUB_UINT":     "123456789",
+		"SUB_INT64":    "6666",
+		"LOG-LEVEL":    "info",
+		"SUB_DURATION": "10s",
+		"NILINT":       "2",
+		"NILINT8":      "9",
+		"NILINT16":     "17",
+		// "P_VALUE":      "yoo",
 	}
 
 	for k, v := range ENV {
@@ -199,7 +199,7 @@ func TestParse(t *testing.T) {
 	// }
 }
 
-func TestDefault(t *testing.T) {
+func TestParseDefault(t *testing.T) {
 	empty := ""
 	_int8 := int8(8)
 	_bool := true
@@ -211,7 +211,7 @@ func TestDefault(t *testing.T) {
 		NilInt8:  &_int8,
 		NilBool:  &_bool,
 	}
-	if err := Default(&config); err != nil {
+	if err := Parse(&config); err != nil {
 		t.Errorf("set default error: %s", err)
 	}
 
@@ -237,7 +237,7 @@ func TestDefault(t *testing.T) {
 	// test pointers
 	config.Nil = nil
 	config.NilBool = nil
-	if err := Default(&config); err != nil {
+	if err := Parse(&config); err != nil {
 		t.Errorf("set default error: %s", err)
 	}
 	if config.Nil == nil {
@@ -299,7 +299,7 @@ func TestGetKeyLookupValue(t *testing.T) {
 
 func TestIgnoreFunc(t *testing.T) {
 	config1 := configType{}
-	if err := Default(&config1); err != nil {
+	if err := Parse(&config1); err != nil {
 		t.Error(err)
 	}
 
@@ -313,7 +313,7 @@ func TestIgnoreFunc(t *testing.T) {
 		}
 		return true
 	}
-	if err := Default(&config2); err != nil {
+	if err := Parse(&config2); err != nil {
 		t.Fatal(err)
 	}
 
@@ -328,17 +328,23 @@ func TestIgnoreFunc(t *testing.T) {
 
 func ExampleParse() {
 	type config struct {
-		Age  int
-		Name string
+		Age      int           `default:"18"`
+		Name     string        `default:"wrfly"`
+		Duration time.Duration `default:"10d"`
 	}
 	c := &config{}
-	os.Setenv("ECP_AGE", "10")
 	if err := Parse(&c); err != nil {
 		panic(err)
 	}
 
-	// c.Age=10
-	if c.Age != 10 {
+	os.Setenv("AGE", "10")
+	if err := Parse(&c); err != nil {
+		panic(err)
+	}
+
+	// now you'll get a config with
+	// `Age=10` and `Name=wrfly`
+	if c.Age != 10 || c.Name != "wrfly" || c.Duration != time.Hour*24*10 {
 		panic("???")
 	}
 }
@@ -352,24 +358,6 @@ func ExampleList() {
 		fmt.Printf("env %s", key)
 	}
 
-	// env ECP_AGE=
-	// env ECP_NAME=
-}
-
-func ExampleDefault() {
-	type config struct {
-		Age      int           `default:"10"`
-		Name     string        `default:"wrfly"`
-		Duration time.Duration `default:"10d"`
-	}
-	c := &config{}
-	if err := Default(&c); err != nil {
-		panic(err)
-	}
-
-	// now you'll get a config with
-	// `Age=10` and `Name=wrfly`
-	if c.Age != 10 || c.Name != "wrfly" || c.Duration != time.Hour*24*10 {
-		panic("???")
-	}
+	// env AGE=
+	// env NAME=
 }

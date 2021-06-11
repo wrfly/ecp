@@ -43,7 +43,7 @@ func main() {
 
     // set some env
     envs := map[string]string{
-        "ECP_LOGLEVEL": "info",
+        "LOGLEVEL": "info",
         "PORT":         "1234",
     }
     for k, v := range envs {
@@ -73,11 +73,11 @@ Outputs:
 ```txt
 default log level: [ debug ]
 
-export ECP_LOGLEVEL=info
+export LOGLEVEL=info
 export PORT=1234
 
 new log level: [ info ], port: [ 1234 ]
 
-ECP_LOGLEVEL=debug
+LOGLEVEL=debug
 PORT=
 ```

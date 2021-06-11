@@ -38,14 +38,9 @@ func New() *ecp {
 
 func (e *ecp) Parse(config interface{}, prefix ...string) error {
 	if prefix == nil {
-		prefix = []string{"ECP"}
+		prefix = []string{""}
 	}
 	_, err := e.rangeOver(roOption{config, true, prefix[0], ""})
-	return err
-}
-
-func (e *ecp) Default(config interface{}) error {
-	_, err := e.rangeOver(roOption{config, true, "", ""})
 	return err
 }
 
@@ -53,7 +48,7 @@ func (e *ecp) List(config interface{}, prefix ...string) []string {
 	list := []string{}
 
 	if prefix == nil {
-		prefix = []string{"ECP"}
+		prefix = []string{""}
 	}
 	parentName := prefix[0]
 
@@ -87,8 +82,8 @@ func List(config interface{}, prefix ...string) []string {
 	return globalEcp.List(config, prefix...)
 }
 
-// Parse the configuration through environments starting with the prefix
-// or you can ignore the prefix and the default prefix key will be `ECP`
+// Parse the configuration through environments starting with
+// the prefix (or not)
 // ecp.Parse(&config) or ecp.Parse(&config, "PREFIX")
 //
 // Parse will overwrite the existing value if there is an environment
@@ -100,12 +95,7 @@ func List(config interface{}, prefix ...string) []string {
 // set to the default value. You can change the basic type to a pointer
 // type, thus Parse will only set the default value when the field is
 // nil, not the zero value.
-func Parse(config interface{}, prefix ...string) error {
-	return globalEcp.Parse(config, prefix...)
-}
-
-// the default value of the config is set by a tag named "default"
-// for example, you can define a struct like:
+// for example:
 //
 //    type config struct {
 //        One   string   `default:"1"`
@@ -114,14 +104,6 @@ func Parse(config interface{}, prefix ...string) error {
 //    }
 //    c := &config{}
 //
-// then you can use ecp.Default(&c) to parse the default value to the struct.
-// note, the Default function will not overwrite the existing value, if the
-// config key has already been set no matter whether it has a default tag.
-// And the default value will be nil (nil of the type) if the "default" tag is
-// empty.
-
-// Default set config with its default value
-// DEPRECATED: just use `Parse`
-func Default(config interface{}) error {
-	return globalEcp.Default(config)
+func Parse(config interface{}, prefix ...string) error {
+	return globalEcp.Parse(config, prefix...)
 }
