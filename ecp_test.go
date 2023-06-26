@@ -66,6 +66,7 @@ type configType struct {
 		Int       int64  `default:"111"`
 		SubStruct struct {
 			Bool bool `default:"true"`
+			Int  int  `default:"123"`
 		}
 	}
 

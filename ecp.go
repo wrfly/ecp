@@ -12,7 +12,6 @@ type ecp struct {
 	GetKey      GetKeyFunc
 	LookupValue LookupValueFunc
 	IgnoreKey   IgnoreKeyFunc
-	LookupKey   LookupKeyFunc
 
 	SplitChar string
 }
@@ -21,7 +20,6 @@ var globalEcp = &ecp{
 	GetKey:      getKeyFromEnv,
 	IgnoreKey:   ignoreEnvKey,
 	LookupValue: lookupValueFromEnv,
-	LookupKey:   lookupKey,
 	SplitChar:   space,
 }
 
@@ -31,7 +29,6 @@ func New() *ecp {
 		GetKey:      getKeyFromEnv,
 		IgnoreKey:   ignoreEnvKey,
 		LookupValue: lookupValueFromEnv,
-		LookupKey:   lookupKey,
 		SplitChar:   space,
 	}
 }
@@ -56,18 +53,18 @@ func (e *ecp) List(config interface{}, prefix ...string) []string {
 	configType := configValue.Type()
 	for index := 0; index < configValue.NumField(); index++ {
 		all := e.getAll(gaOption{configType, configValue, index, parentName})
-		if all.sName == "-" || all.kName == "" {
+		if all.parent == "-" || all.key == "" {
 			continue
 		}
-		switch all.rValue.Kind() {
+		switch all.value.Kind() {
 		case reflect.Struct:
-			prefix := e.GetKey(parentName, all.sName, all.rTag)
-			list = append(list, e.List(all.rValue, prefix)...)
+			prefix := e.GetKey(parentName, all.parent, all.tag)
+			list = append(list, e.List(all.value, prefix)...)
 		default:
-			if strings.Contains(all.value, " ") {
-				all.value = fmt.Sprintf("\"%s\"", all.value)
+			if strings.Contains(all.defVal, " ") {
+				all.defVal = fmt.Sprintf("\"%s\"", all.defVal)
 			}
-			list = append(list, fmt.Sprintf("%s=%s", all.kName, all.value))
+			list = append(list, fmt.Sprintf("%s=%s", all.key, all.defVal))
 		}
 	}
 
@@ -87,7 +84,7 @@ func List(config interface{}, prefix ...string) []string {
 // ecp.Parse(&config) or ecp.Parse(&config, "PREFIX")
 //
 // Parse will overwrite the existing value if there is an environment
-// configration matched with the struct name or the "env" tag
+// configuration matched with the struct name or the "env" tag
 // name.
 //
 // Also, Parse will set the default value to the config, if it's not set
@@ -97,13 +94,12 @@ func List(config interface{}, prefix ...string) []string {
 // nil, not the zero value.
 // for example:
 //
-//    type config struct {
-//        One   string   `default:"1"`
-//        Two   int      `default:"2"`
-//        Three []string `default:"1,2,3"`
-//    }
-//    c := &config{}
-//
+//	type config struct {
+//	    One   string   `default:"1"`
+//	    Two   int      `default:"2"`
+//	    Three []string `default:"1,2,3"`
+//	}
+//	c := &config{}
 func Parse(config interface{}, prefix ...string) error {
 	return globalEcp.Parse(config, prefix...)
 }

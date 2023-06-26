@@ -35,7 +35,7 @@ type Conf struct {
 
 func main() {
     config := &Conf{}
-    if err := ecp.Default(config); err != nil {
+    if err := ecp.Parse(config); err != nil {
         panic(err)
     }
     fmt.Printf("default log level: [ %s ]\n", config.LogLevel)

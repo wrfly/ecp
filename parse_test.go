@@ -75,7 +75,7 @@ func TestParseSlice(t *testing.T) {
 	})
 
 	t.Run("test int", func(t *testing.T) {
-		v := reflect.Value{}
+		var v reflect.Value
 		x := []string{"Int", "Int8", "Int16", "Int32", "Int64"}
 		for _, name := range x {
 			v = toValue(s).FieldByName(name)
@@ -104,7 +104,7 @@ func TestParseSlice(t *testing.T) {
 	})
 
 	t.Run("test uint", func(t *testing.T) {
-		v := reflect.Value{}
+		var v reflect.Value
 		x := []string{"UInt", "UInt8", "UInt16", "UInt32", "UInt64"}
 		for _, name := range x {
 			v = toValue(s).FieldByName(name)
@@ -133,7 +133,7 @@ func TestParseSlice(t *testing.T) {
 	})
 
 	t.Run("test float", func(t *testing.T) {
-		v := reflect.Value{}
+		var v reflect.Value
 		for _, name := range []string{"Float32", "Float64"} {
 			v = toValue(s).FieldByName(name)
 			if err := parseSlice("1.1 2.2 3.3", v); err != nil {
