@@ -16,7 +16,8 @@ type ecp struct {
 }
 
 type advanceConfig struct {
-	SplitChar string
+	SplitChar string // split slice
+	SetValue  SetValueFunc
 }
 
 var globalEcp = &ecp{

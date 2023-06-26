@@ -102,6 +102,11 @@ func (e *ecp) rangeOver(opts roOption) (reflect.Value, error) {
 			continue
 		}
 
+		// set value via self-defined function
+		if e.Advance.SetValue != nil && e.Advance.SetValue(info.tag, field, v) {
+			continue
+		}
+
 		switch kind {
 		case reflect.String:
 			if field.String() != "" && !exist {
