@@ -7,29 +7,31 @@ import (
 )
 
 type (
-	// GetKeyFunc how to get the key name
-	GetKeyFunc func(parentName, structName string, tag reflect.StructTag) (key string)
+	// BuildKeyFunc how to get the key name
+	BuildKeyFunc func(structure, field string, tag reflect.StructTag) string
 	// LookupValueFunc returns the value and whether exist
-	LookupValueFunc func(field reflect.Value, key string) (value string, exist bool)
-	// IgnoreKeyFunc ignore this key
-	IgnoreKeyFunc func(field reflect.Value, key string) bool
+	LookupValueFunc func(key string) (value string, exist bool)
+	// SetValueFunc set the field value and returns whether this filed is set by this function
+	SetValueFunc func(tag reflect.StructTag, field reflect.Value, val string) bool
 )
 
 const space = " "
 
 // default functions
 var (
-	getKeyFromEnv = func(pName, sName string, tag reflect.StructTag) string {
+	buildKeyFromEnv = func(structure, field string, tag reflect.StructTag) (key string) {
 		for _, key := range []string{"env", "yaml", "json"} {
 			if e := tag.Get(key); e != "" {
 				return strings.Split(e, ",")[0]
 			}
 		}
-		if pName == "" {
-			return strings.ToUpper(sName)
+		if structure == "" {
+			key = field
+		} else {
+			key = structure + "_" + field
 		}
-		return strings.ToUpper(pName + "_" + sName)
+		return strings.ToUpper(key)
 	}
-	lookupValueFromEnv = func(_ reflect.Value, key string) (string, bool) { return os.LookupEnv(key) }
-	ignoreEnvKey       = func(_ reflect.Value, key string) bool { return key == "-" }
+
+	lookupValueFromEnv = func(key string) (string, bool) { return os.LookupEnv(key) }
 )

@@ -9,32 +9,38 @@ import (
 )
 
 type ecp struct {
-	GetKey      GetKeyFunc
+	BuildKey    BuildKeyFunc
 	LookupValue LookupValueFunc
-	IgnoreKey   IgnoreKeyFunc
 
-	SplitChar string
+	Advance advanceConfig
+}
+
+type advanceConfig struct {
+	SplitChar string // split slice
+	SetValue  SetValueFunc
 }
 
 var globalEcp = &ecp{
-	GetKey:      getKeyFromEnv,
-	IgnoreKey:   ignoreEnvKey,
+	BuildKey:    buildKeyFromEnv,
 	LookupValue: lookupValueFromEnv,
-	SplitChar:   space,
+	Advance: advanceConfig{
+		SplitChar: space,
+	},
 }
 
 // New ecp object
 func New() *ecp {
 	return &ecp{
-		GetKey:      getKeyFromEnv,
-		IgnoreKey:   ignoreEnvKey,
+		BuildKey:    buildKeyFromEnv,
 		LookupValue: lookupValueFromEnv,
-		SplitChar:   space,
+		Advance: advanceConfig{
+			SplitChar: space,
+		},
 	}
 }
 
 func (e *ecp) Parse(config interface{}, prefix ...string) error {
-	if prefix == nil {
+	if len(prefix) == 0 {
 		prefix = []string{""}
 	}
 	_, err := e.rangeOver(roOption{config, true, prefix[0], ""})
@@ -44,7 +50,7 @@ func (e *ecp) Parse(config interface{}, prefix ...string) error {
 func (e *ecp) List(config interface{}, prefix ...string) []string {
 	list := []string{}
 
-	if prefix == nil {
+	if len(prefix) == 0 {
 		prefix = []string{""}
 	}
 	parentName := prefix[0]
@@ -52,17 +58,17 @@ func (e *ecp) List(config interface{}, prefix ...string) []string {
 	configValue := toValue(config)
 	configType := configValue.Type()
 	for index := 0; index < configValue.NumField(); index++ {
-		all := e.getAll(gaOption{configType, configValue, index, parentName})
+		all := e.getAll(getAllOpt{configType, configValue, index, parentName})
 		if all.parent == "-" || all.key == "" {
 			continue
 		}
 		switch all.value.Kind() {
 		case reflect.Struct:
-			prefix := e.GetKey(parentName, all.parent, all.tag)
+			prefix := e.BuildKey(parentName, all.parent, all.tag)
 			list = append(list, e.List(all.value, prefix)...)
 		default:
 			if strings.Contains(all.defVal, " ") {
-				all.defVal = fmt.Sprintf("\"%s\"", all.defVal)
+				all.defVal = fmt.Sprintf(`"%s"`, all.defVal)
 			}
 			list = append(list, fmt.Sprintf("%s=%s", all.key, all.defVal))
 		}

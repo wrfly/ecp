@@ -24,7 +24,7 @@ func (e *ecp) parseSlice(v string, field reflect.Value) error {
 
 	// either space nor commas is perfect, but I think space is better
 	// since it's more natural: fmt.Println([]int{1, 2, 3}) = [1 2 3]
-	stringSlice := strings.Split(v, e.SplitChar) // split by space
+	stringSlice := strings.Split(v, e.Advance.SplitChar) // split by space
 
 	field.Set(reflect.MakeSlice(field.Type(), len(stringSlice), cap(stringSlice)))
 

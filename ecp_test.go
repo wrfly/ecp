@@ -124,7 +124,7 @@ func TestList(t *testing.T) {
 	})
 
 	t.Run("with get key", func(t *testing.T) {
-		globalEcp.GetKey = func(parentName, structName string, tag reflect.StructTag) (key string) {
+		globalEcp.BuildKey = func(parentName, structName string, tag reflect.StructTag) (key string) {
 			return strings.ToLower(parentName) + "." + strings.ToLower(structName)
 		}
 		list := List(config)
@@ -133,7 +133,7 @@ func TestList(t *testing.T) {
 		}
 
 		// reset get key function
-		globalEcp.GetKey = getKeyFromEnv
+		globalEcp.BuildKey = buildKeyFromEnv
 	})
 }
 
@@ -260,25 +260,27 @@ func TestParseDefault(t *testing.T) {
 func TestGetKeyLookupValue(t *testing.T) {
 	config := configType{}
 
-	globalEcp.GetKey = func(parentName, structName string, tag reflect.StructTag) (key string) {
-		return parentName + "." + structName
+	globalEcp.BuildKey = func(parentName, structName string, tag reflect.StructTag) (key string) {
+		if parentName != "" {
+			return parentName + "." + structName
+		}
+		return structName
 	}
 	defer func() {
-		globalEcp.GetKey = getKeyFromEnv
+		globalEcp.BuildKey = buildKeyFromEnv
 	}()
 
-	globalEcp.LookupValue = func(field reflect.Value, key string) (value string, exist bool) {
-		switch field.Kind() {
-		case reflect.String:
+	globalEcp.LookupValue = func(key string) (value string, exist bool) {
+		key = strings.ToLower(key)
+		switch {
+		case strings.Contains(key, "book"):
 			return "string", true
-		case reflect.Int:
+		case strings.Contains(key, "log"):
+			return "level", true
+		case strings.Contains(key, "port"):
 			return "-100", true
-		case reflect.Uint32:
-			return "32", true
-		case reflect.Float64:
-			return "-3.1415", true
-		case reflect.Bool:
-			return "True", true
+		case strings.Contains(key, "bool"):
+			return "true", true
 		}
 		return "", false
 	}
@@ -288,7 +290,7 @@ func TestGetKeyLookupValue(t *testing.T) {
 	}
 	switch {
 	case config.Port != -100:
-	case config.LogLevel != "string":
+	case config.LogLevel != "level":
 	case config.Sub.Book != "string":
 	case !config.Sub.Bool:
 	case !config.Sub.Bool2:
@@ -296,35 +298,6 @@ func TestGetKeyLookupValue(t *testing.T) {
 		return
 	}
 	t.Errorf("parse failed, config: %+v", config)
-}
-
-func TestIgnoreFunc(t *testing.T) {
-	config1 := configType{}
-	if err := Parse(&config1); err != nil {
-		t.Error(err)
-	}
-
-	config2 := configType{}
-	globalEcp.IgnoreKey = func(field reflect.Value, key string) bool {
-		switch field.Kind() {
-		case reflect.Int64, reflect.Int, reflect.Uint:
-		case reflect.String:
-		default:
-			return false
-		}
-		return true
-	}
-	if err := Parse(&config2); err != nil {
-		t.Fatal(err)
-	}
-
-	if config1.Port == config2.Port {
-		t.Error("not going to happen")
-	}
-
-	if config1.LogLevel == config2.LogLevel {
-		t.Error("not going to happen")
-	}
 }
 
 func ExampleParse() {

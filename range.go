@@ -16,7 +16,7 @@ func toValue(config interface{}) reflect.Value {
 	return value
 }
 
-type gaOption struct {
+type getAllOpt struct {
 	typ    reflect.Type
 	value  reflect.Value
 	index  int    // field index
@@ -31,7 +31,7 @@ type getAllResult struct {
 	defVal string // default value
 }
 
-func (e *ecp) getAll(opts gaOption) getAllResult {
+func (e *ecp) getAll(opts getAllOpt) getAllResult {
 	field := opts.typ.Field(opts.index)
 
 	r := getAllResult{
@@ -48,7 +48,7 @@ func (e *ecp) getAll(opts gaOption) getAllResult {
 		r.parent = strings.Split(v, ",")[0]
 	}
 
-	r.key = e.GetKey(opts.parent, r.parent, r.tag)
+	r.key = e.BuildKey(opts.parent, r.parent, r.tag)
 
 	return r
 }
@@ -67,16 +67,18 @@ func (e *ecp) rangeOver(opts roOption) (reflect.Value, error) {
 	rType := rValue.Type()
 
 	for index := 0; index < rValue.NumField(); index++ {
-		info := e.getAll(gaOption{rType, rValue, index, opts.prefix})
+		info := e.getAll(getAllOpt{rType, rValue, index, opts.prefix})
 		field := info.value
 		structName := info.parent
 		keyName := info.key
 		defaultV := info.defVal
 
+		// ignore this key
+		if keyName == "" {
+			continue
+		}
+
 		if opts.find != "" {
-			if strings.Contains(keyName, ".") {
-				fmt.Println(keyName)
-			}
 			if opts.find == keyName {
 				return field, nil
 			}
@@ -86,12 +88,7 @@ func (e *ecp) rangeOver(opts roOption) (reflect.Value, error) {
 			}
 		}
 
-		// ignore this key
-		if e.IgnoreKey(field, structName) || e.IgnoreKey(field, keyName) {
-			continue
-		}
-
-		v, exist := e.LookupValue(field, keyName)
+		v, exist := e.LookupValue(keyName)
 		if opts.setDef && !exist {
 			v = defaultV
 		}
@@ -102,6 +99,11 @@ func (e *ecp) rangeOver(opts roOption) (reflect.Value, error) {
 
 		kind := field.Kind()
 		if v == "" && kind != reflect.Struct {
+			continue
+		}
+
+		// set value via self-defined function
+		if e.Advance.SetValue != nil && e.Advance.SetValue(info.tag, field, v) {
 			continue
 		}
 
@@ -174,7 +176,7 @@ func (e *ecp) rangeOver(opts roOption) (reflect.Value, error) {
 			}
 
 		case reflect.Struct:
-			prefix := e.GetKey(opts.prefix, structName, info.tag)
+			prefix := e.BuildKey(opts.prefix, structName, info.tag)
 			v, err := e.rangeOver(roOption{field, opts.setDef, prefix, opts.find})
 			if err != nil {
 				return reflect.Value{}, err
