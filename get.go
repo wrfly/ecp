@@ -12,9 +12,9 @@ func (e *ecp) getValue(config interface{}, keyName string) (reflect.Value, error
 	}
 
 	if !v.IsValid() {
-		return reflect.Value{}, fmt.Errorf("invalid type %v", v)
+		return reflect.Value{}, fmt.Errorf("key %s not found", keyName)
 	}
-	return v, err
+	return v, nil
 }
 
 func (e *ecp) Get(config interface{}, keyName string) (interface{}, error) {

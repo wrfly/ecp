@@ -17,39 +17,38 @@ func toValue(config interface{}) reflect.Value {
 }
 
 type gaOption struct {
-	rType  reflect.Type
-	rValue reflect.Value
+	typ    reflect.Type
+	value  reflect.Value
 	index  int    // field index
-	pName  string // parent field name (struct name)
+	parent string // parent field name (struct name)
 }
 
 type getAllResult struct {
-	rValue reflect.Value
-	rTag   reflect.StructTag
-	sName  string // struct name
-	kName  string // key name
-	value  string // default value
+	value  reflect.Value
+	tag    reflect.StructTag
+	parent string // struct name
+	key    string // key name
+	defVal string // default value
 }
 
 func (e *ecp) getAll(opts gaOption) getAllResult {
-	structField := opts.rType.Field(opts.index)
+	field := opts.typ.Field(opts.index)
 
 	r := getAllResult{
-		rTag:   structField.Tag,
-		rValue: opts.rValue.Field(opts.index),
-		sName:  structField.Name,
-		value:  structField.Tag.Get("default"),
+		tag:    field.Tag,
+		value:  opts.value.Field(opts.index),
+		parent: field.Name,
+		defVal: field.Tag.Get("default"),
 	}
 
 	// support yaml or json
-	if v, exist := r.rTag.Lookup("yaml"); exist {
-		r.sName = strings.Split(v, ",")[0]
-	}
-	if v, exist := r.rTag.Lookup("json"); exist {
-		r.sName = strings.Split(v, ",")[0]
+	if v, exist := r.tag.Lookup("yaml"); exist {
+		r.parent = strings.Split(v, ",")[0]
+	} else if v, exist := r.tag.Lookup("json"); exist {
+		r.parent = strings.Split(v, ",")[0]
 	}
 
-	r.kName = e.GetKey(opts.pName, r.sName, r.rTag)
+	r.key = e.GetKey(opts.parent, r.parent, r.tag)
 
 	return r
 }
@@ -59,7 +58,7 @@ type roOption struct {
 	target interface{}
 	setDef bool   // set default value
 	prefix string // prefix, usually the parent struct name
-	lookup string // lookup some key
+	find   string // lookup some key
 }
 
 func (e *ecp) rangeOver(opts roOption) (reflect.Value, error) {
@@ -67,23 +66,23 @@ func (e *ecp) rangeOver(opts roOption) (reflect.Value, error) {
 	rValue := toValue(opts.target)
 	rType := rValue.Type()
 
-	fieldNum := rValue.NumField()
-	for index := 0; index < fieldNum; index++ {
-		all := e.getAll(gaOption{rType, rValue, index, opts.prefix})
-		field := all.rValue
-		structName := all.sName
-		keyName := all.kName
-		defaultV := all.value
+	for index := 0; index < rValue.NumField(); index++ {
+		info := e.getAll(gaOption{rType, rValue, index, opts.prefix})
+		field := info.value
+		structName := info.parent
+		keyName := info.key
+		defaultV := info.defVal
 
-		if opts.lookup != "" {
-			keyName = e.LookupKey(keyName, opts.prefix, structName)
-			if !strings.HasPrefix(opts.lookup, keyName) {
-				continue
+		if opts.find != "" {
+			if strings.Contains(keyName, ".") {
+				fmt.Println(keyName)
 			}
-			if opts.lookup == keyName {
+			if opts.find == keyName {
 				return field, nil
-			} else if index == fieldNum {
-				return field, fmt.Errorf("key %s not found", opts.lookup)
+			}
+			// skip this field
+			if field.Kind() != reflect.Struct {
+				continue
 			}
 		}
 
@@ -160,10 +159,6 @@ func (e *ecp) rangeOver(opts roOption) (reflect.Value, error) {
 			field.SetUint(parsed)
 
 		case reflect.Bool:
-			if v == "" {
-				continue
-			}
-
 			parsed, err := strconv.ParseBool(strings.ToLower(v))
 			if err != nil {
 				return field, fmt.Errorf("convert %s error: %s", keyName, err)
@@ -179,20 +174,14 @@ func (e *ecp) rangeOver(opts roOption) (reflect.Value, error) {
 			}
 
 		case reflect.Struct:
-			prefix := e.GetKey(opts.prefix, structName, all.rTag)
-			if opts.lookup != "" {
-				prefix = structName
-				if opts.prefix != "" {
-					prefix = opts.prefix + "." + structName
-				}
-			}
-			v, err := e.rangeOver(roOption{field, opts.setDef, prefix, opts.lookup})
+			prefix := e.GetKey(opts.prefix, structName, info.tag)
+			v, err := e.rangeOver(roOption{field, opts.setDef, prefix, opts.find})
 			if err != nil {
-				return field, err
-			} else if opts.lookup != "" {
+				return reflect.Value{}, err
+			}
+			if opts.find != "" && v.IsValid() {
 				return v, nil
 			}
-			field = v
 
 		case reflect.Ptr:
 			// only set default value to nil pointer

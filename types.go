@@ -13,8 +13,6 @@ type (
 	LookupValueFunc func(field reflect.Value, key string) (value string, exist bool)
 	// IgnoreKeyFunc ignore this key
 	IgnoreKeyFunc func(field reflect.Value, key string) bool
-	// LookupKeyFunc returns the key name
-	LookupKeyFunc func(original, prefix, structName string) string
 )
 
 const space = " "
@@ -22,8 +20,10 @@ const space = " "
 // default functions
 var (
 	getKeyFromEnv = func(pName, sName string, tag reflect.StructTag) string {
-		if e := tag.Get("env"); e != "" {
-			return strings.Split(e, ",")[0]
+		for _, key := range []string{"env", "yaml", "json"} {
+			if e := tag.Get(key); e != "" {
+				return strings.Split(e, ",")[0]
+			}
 		}
 		if pName == "" {
 			return strings.ToUpper(sName)
@@ -32,11 +32,4 @@ var (
 	}
 	lookupValueFromEnv = func(_ reflect.Value, key string) (string, bool) { return os.LookupEnv(key) }
 	ignoreEnvKey       = func(_ reflect.Value, key string) bool { return key == "-" }
-
-	lookupKey = func(original, prefix, structName string) string {
-		if prefix == "" {
-			return structName
-		}
-		return prefix + "." + structName
-	}
 )
