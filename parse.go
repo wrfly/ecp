@@ -8,6 +8,9 @@ import (
 	"time"
 )
 
+var duration []time.Duration
+var durationType = reflect.TypeOf(duration)
+
 // parseSlice support slice of string, int, int8, int16, int32, int64
 // float32, float64, uint, uint8, uint16, uint32, uint64, bool and time.Duration
 func (e *ecp) parseSlice(v string, field reflect.Value) error {
@@ -79,18 +82,15 @@ func (e *ecp) parseSlice(v string, field reflect.Value) error {
 		field.Set(reflect.ValueOf(slice))
 
 	case reflect.Int64:
-
-		if timeSlice, err := func() ([]time.Duration, error) {
+		if field.Type() == durationType {
 			timeSlice := make([]time.Duration, 0, len(stringSlice))
 			for _, s := range stringSlice {
 				d, err := parseDuration(s)
 				if err != nil {
-					return nil, err
+					return err
 				}
 				timeSlice = append(timeSlice, d)
 			}
-			return timeSlice, nil
-		}(); err == nil {
 			field.Set(reflect.ValueOf(timeSlice))
 		} else {
 			slice := []int64{}
