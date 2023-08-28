@@ -14,6 +14,10 @@ func (e *ecp) getValue(config interface{}, keyName string) (reflect.Value, error
 	if !v.IsValid() {
 		return reflect.Value{}, fmt.Errorf("key %s not found", keyName)
 	}
+
+	if !v.CanInterface() {
+		return reflect.Value{}, fmt.Errorf("bad structure field %s", keyName)
+	}
 	return v, nil
 }
 
