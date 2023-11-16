@@ -58,6 +58,9 @@ func (e *ecp) List(config interface{}, prefix ...string) []string {
 	configValue := toValue(config)
 	configType := configValue.Type()
 	for index := 0; index < configValue.NumField(); index++ {
+		if !configType.Field(index).IsExported() {
+			continue
+		}
 		all := e.getAll(getAllOpt{configType, configValue, index, parentName})
 		if all.parent == "-" || all.key == "" {
 			continue
