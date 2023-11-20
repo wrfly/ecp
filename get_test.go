@@ -41,7 +41,7 @@ func TestGet(t *testing.T) {
 	toEnvName := func(s string) string { return strings.ToUpper(strings.ReplaceAll(s, ".", "_")) }
 
 	// int
-	if p, err := GetInt64(config, "port"); err != nil {
+	if p, err := GetInt64(config, toEnvName("port")); err != nil {
 		t.Fatal(err)
 	} else if p != int64(config.Port) {
 		t.Fatal("wrong port")

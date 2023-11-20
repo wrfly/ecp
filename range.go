@@ -41,11 +41,15 @@ func (e *ecp) getAll(opts getAllOpt) getAllResult {
 		defVal: field.Tag.Get("default"),
 	}
 
-	// support yaml or json
-	if v, exist := r.tag.Lookup("yaml"); exist {
-		r.parent = strings.Split(v, ",")[0]
-	} else if v, exist := r.tag.Lookup("json"); exist {
-		r.parent = strings.Split(v, ",")[0]
+	for _, tag := range []string{"yaml", "json"} {
+		v, exist := r.tag.Lookup(tag)
+		if !exist {
+			continue
+		}
+		if key := strings.Split(v, ",")[0]; key != "" {
+			r.parent = key
+			break
+		}
 	}
 
 	r.key = e.BuildKey(opts.parent, r.parent, r.tag)
