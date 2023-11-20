@@ -20,10 +20,8 @@ const space = " "
 // default functions
 var (
 	buildKeyFromEnv = func(structure, field string, tag reflect.StructTag) (key string) {
-		for _, key := range []string{"env", "yaml", "json"} {
-			if e := tag.Get(key); e != "" {
-				return strings.Split(e, ",")[0]
-			}
+		if e := tag.Get("env"); e != "" {
+			return e
 		}
 		if structure == "" {
 			key = field
