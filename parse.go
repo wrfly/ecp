@@ -207,7 +207,9 @@ func (e *ecp) parsePointer(typ reflect.Type, value string) (interface{}, error) 
 
 	case reflect.Int, reflect.Int8, reflect.Int16,
 		reflect.Int32, reflect.Int64:
-		vInt, err := strconv.ParseInt(value, 10, 64)
+		// parse with the pointer's bit size so an out-of-range value
+		// errors out instead of being silently truncated
+		vInt, err := strconv.ParseInt(value, 10, typ.Bits())
 		if err != nil {
 			return nil, err
 		}
@@ -230,7 +232,7 @@ func (e *ecp) parsePointer(typ reflect.Type, value string) (interface{}, error) 
 
 	case reflect.Uint, reflect.Uint8, reflect.Uint16,
 		reflect.Uint32, reflect.Uint64:
-		v, err := strconv.ParseUint(value, 10, 64)
+		v, err := strconv.ParseUint(value, 10, typ.Bits())
 		if err != nil {
 			return nil, err
 		}
@@ -275,10 +277,11 @@ func (e *ecp) parsePointer(typ reflect.Type, value string) (interface{}, error) 
 
 	case reflect.Slice:
 		newValue := reflect.New(typ)
-		if err := e.parseSlice(value, newValue); err != nil {
+		// parseSlice needs the slice value itself, not the pointer to it
+		if err := e.parseSlice(value, newValue.Elem()); err != nil {
 			return rValue, err
 		}
-		rValue = newValue
+		return newValue.Interface(), nil
 
 	default:
 		return rValue, fmt.Errorf("unsupported pointer kind %s", typ.Kind())
