@@ -56,6 +56,9 @@ func (e *ecp) List(config interface{}, prefix ...string) []string {
 	parentName := prefix[0]
 
 	configValue := toValue(config)
+	if !configValue.IsValid() || configValue.Kind() != reflect.Struct {
+		return list
+	}
 	configType := configValue.Type()
 	for index := 0; index < configValue.NumField(); index++ {
 		if !configType.Field(index).IsExported() {

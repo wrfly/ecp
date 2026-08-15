@@ -11,7 +11,11 @@ import (
 func toValue(config interface{}) reflect.Value {
 	value, ok := config.(reflect.Value)
 	if !ok {
-		value = reflect.Indirect(reflect.ValueOf(config))
+		value = reflect.ValueOf(config)
+	}
+	// dereference all pointer levels, e.g. Parse(&c) where c is a pointer
+	for value.Kind() == reflect.Ptr && !value.IsNil() {
+		value = value.Elem()
 	}
 	return value
 }
@@ -68,6 +72,9 @@ type roOption struct {
 func (e *ecp) rangeOver(opts roOption) (reflect.Value, error) {
 
 	rValue := toValue(opts.target)
+	if !rValue.IsValid() || rValue.Kind() != reflect.Struct {
+		return reflect.Value{}, fmt.Errorf("config must be a struct or a non-nil pointer to a struct, got %v", opts.target)
+	}
 	rType := rValue.Type()
 
 	for index := 0; index < rValue.NumField(); index++ {
@@ -122,7 +129,7 @@ func (e *ecp) rangeOver(opts roOption) (reflect.Value, error) {
 			if field.Float() != 0 && !exist {
 				continue
 			}
-			parsed, err := strconv.ParseFloat(v, 64)
+			parsed, err := strconv.ParseFloat(v, field.Type().Bits())
 			if err != nil {
 				return field, fmt.Errorf("convert %s error: %s", keyName, err)
 			}
@@ -132,23 +139,28 @@ func (e *ecp) rangeOver(opts roOption) (reflect.Value, error) {
 			if field.Int() != 0 && !exist {
 				continue
 			}
-			// since duration is int64 too, parse it first
-			// if the duration contains `d` (day), we should support it
-			// fix #6
-			d, err := parseDuration(v)
-			if err == nil {
+			// only time.Duration (an int64 based type) fields accept
+			// duration syntax like "10s" or "1d"; parsing a plain int
+			// field that way would silently turn "10s" into 1e10
+			if field.Type() == reflect.TypeOf(time.Duration(0)) {
+				d, err := parseDuration(v)
+				if err != nil {
+					return field, fmt.Errorf("convert %s error: %s", keyName, err)
+				}
 				field.SetInt(int64(d))
 				continue
 			}
-			v, err = parseScientific(v)
+			v, err := parseScientific(v)
 			if err != nil {
 				return field, fmt.Errorf("convert %s error: %s", keyName, err)
 			}
-			parsed, err := strconv.Atoi(v)
+			// parse with the field's bit size so an out-of-range value
+			// errors out instead of being silently truncated
+			parsed, err := strconv.ParseInt(v, 10, field.Type().Bits())
 			if err != nil {
 				return field, fmt.Errorf("convert %s error: %s", keyName, err)
 			}
-			field.SetInt(int64(parsed))
+			field.SetInt(parsed)
 
 		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 			if field.Uint() != 0 && !exist {
@@ -158,7 +170,7 @@ func (e *ecp) rangeOver(opts roOption) (reflect.Value, error) {
 			if err != nil {
 				return field, fmt.Errorf("convert %s error: %s", keyName, err)
 			}
-			parsed, err := strconv.ParseUint(v, 10, 64)
+			parsed, err := strconv.ParseUint(v, 10, field.Type().Bits())
 			if err != nil {
 				return field, fmt.Errorf("convert %s error: %s", keyName, err)
 			}
@@ -190,8 +202,9 @@ func (e *ecp) rangeOver(opts roOption) (reflect.Value, error) {
 			}
 
 		case reflect.Ptr:
-			// only set default value to nil pointer
-			if !field.IsNil() {
+			// only set the default value to a nil pointer, but still
+			// allow an existing environment value to overwrite a set one
+			if !field.IsNil() && !exist {
 				continue
 			}
 			// get pointer real kind
@@ -209,31 +222,32 @@ func (e *ecp) rangeOver(opts roOption) (reflect.Value, error) {
 }
 
 func parseScientific(v string) (string, error) {
-	switch {
-	case strings.Contains(v, ","):
-		v = strings.ReplaceAll(v, ",", "")
-	case strings.Contains(v, "e"):
-		v = strings.ReplaceAll(v, "e", "E")
-		fallthrough
-	case strings.Contains(v, "E"):
-		if strings.Count(v, "E") != 1 {
-			return "", fmt.Errorf("bad number %s", v)
-		}
-		index := strings.Index(v, "E")
-		if index+1 == len(v) {
-			return "", fmt.Errorf("bad number %s", v)
-		}
-		result := v[:index]
-		n, err := strconv.Atoi(v[index+1:])
-		if err != nil {
-			return "", err
-		}
-		for i := 0; i < n; i++ {
-			result += "0"
-		}
-		v = result
+	v = strings.ReplaceAll(v, ",", "")
+
+	index := strings.IndexAny(v, "eE")
+	if index == -1 {
+		return v, nil
 	}
-	return v, nil
+	if strings.Count(v, "e")+strings.Count(v, "E") != 1 {
+		return "", fmt.Errorf("bad number %s", v)
+	}
+	if index+1 == len(v) {
+		return "", fmt.Errorf("bad number %s", v)
+	}
+	n, err := strconv.Atoi(v[index+1:])
+	if err != nil {
+		return "", err
+	}
+	// a negative exponent would be silently ignored by the expansion
+	// loop below (e.g. "1e-3" -> "1"), which is worse than an error
+	if n < 0 {
+		return "", fmt.Errorf("bad number %s", v)
+	}
+	result := v[:index]
+	for i := 0; i < n; i++ {
+		result += "0"
+	}
+	return result, nil
 }
 
 // parseDuration wrapper func of time.ParseDuration to support `Xd` = `X*24h`
