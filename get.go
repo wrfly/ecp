@@ -5,8 +5,15 @@ import (
 	"reflect"
 )
 
-func (e *ecp) getValue(config interface{}, keyName string) (reflect.Value, error) {
-	v, err := e.rangeOver(roOption{config, false, "", keyName})
+// getValue looks up a field by the environment key it is bound to. The
+// optional prefix must match the one Parse was called with, since that is
+// what the key names are built from.
+func (e *ECP) getValue(config interface{}, keyName string, prefix ...string) (reflect.Value, error) {
+	if len(prefix) == 0 {
+		prefix = []string{""}
+	}
+
+	v, err := e.rangeOver(roOption{target: config, find: keyName, prefix: prefix[0]})
 	if err != nil {
 		return reflect.Value{}, err
 	}
@@ -21,8 +28,9 @@ func (e *ecp) getValue(config interface{}, keyName string) (reflect.Value, error
 	return v, nil
 }
 
-func (e *ecp) Get(config interface{}, keyName string) (interface{}, error) {
-	v, err := e.getValue(config, keyName)
+// Get the value of the keyName in that struct
+func (e *ECP) Get(config interface{}, keyName string, prefix ...string) (interface{}, error) {
+	v, err := e.getValue(config, keyName, prefix...)
 	if err != nil {
 		return nil, err
 	}
@@ -30,88 +38,82 @@ func (e *ecp) Get(config interface{}, keyName string) (interface{}, error) {
 	return v.Interface(), nil
 }
 
-func (e *ecp) GetBool(config interface{}, keyName string) (bool, error) {
-	v, err := e.getValue(config, keyName)
+// GetBool returns bool
+func (e *ECP) GetBool(config interface{}, keyName string, prefix ...string) (bool, error) {
+	v, err := e.getValue(config, keyName, prefix...)
 	if err != nil {
 		return false, err
 	}
 
-	if vv, ok := v.Interface().(bool); ok {
-		return vv, nil
+	if v.Kind() == reflect.Bool {
+		return v.Bool(), nil
 	}
 	return false, fmt.Errorf("value is not bool, it's %s", v.Kind())
 }
 
-func (e *ecp) GetInt64(config interface{}, keyName string) (int64, error) {
-	v, err := e.getValue(config, keyName)
+// GetInt64 returns int64
+func (e *ECP) GetInt64(config interface{}, keyName string, prefix ...string) (int64, error) {
+	v, err := e.getValue(config, keyName, prefix...)
 	if err != nil {
 		return -1, err
 	}
-	i := v.Interface()
 
-	if vv, ok := i.(int); ok {
-		return int64(vv), nil
-	} else if vv, ok := i.(int8); ok {
-		return int64(vv), nil
-	} else if vv, ok := i.(int16); ok {
-		return int64(vv), nil
-	} else if vv, ok := i.(int32); ok {
-		return int64(vv), nil
-	} else if vv, ok := i.(int64); ok {
-		return vv, nil
+	switch v.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return v.Int(), nil
 	}
 
 	return -1, fmt.Errorf("value is %s", v.Kind())
 }
 
-func (e *ecp) GetString(config interface{}, keyName string) (string, error) {
-	v, err := e.getValue(config, keyName)
+// GetString returns string
+func (e *ECP) GetString(config interface{}, keyName string, prefix ...string) (string, error) {
+	v, err := e.getValue(config, keyName, prefix...)
 	if err != nil {
 		return "", err
 	}
 
-	if vv, ok := v.Interface().(string); ok {
-		return vv, nil
+	if v.Kind() == reflect.String {
+		return v.String(), nil
 	}
 	return "", fmt.Errorf("value is not string, it's %s", v.Kind())
 }
 
-func (e *ecp) GetFloat64(config interface{}, keyName string) (float64, error) {
-	v, err := e.getValue(config, keyName)
+// GetFloat64 returns float64
+func (e *ECP) GetFloat64(config interface{}, keyName string, prefix ...string) (float64, error) {
+	v, err := e.getValue(config, keyName, prefix...)
 	if err != nil {
 		return -1, err
 	}
-	i := v.Interface()
-	if vv, ok := i.(float32); ok {
-		return float64(vv), nil
-	}
-	if vv, ok := i.(float64); ok {
-		return vv, nil
+
+	switch v.Kind() {
+	case reflect.Float32, reflect.Float64:
+		return v.Float(), nil
 	}
 	return -1, fmt.Errorf("value is %s", v.Kind())
 }
 
 // Get the value of the keyName in that struct
-func Get(config interface{}, keyName string) (interface{}, error) {
-	return globalEcp.Get(config, keyName)
+func Get(config interface{}, keyName string, prefix ...string) (interface{}, error) {
+	return globalEcp.Get(config, keyName, prefix...)
 }
 
 // GetBool returns bool
-func GetBool(config interface{}, keyName string) (bool, error) {
-	return globalEcp.GetBool(config, keyName)
+func GetBool(config interface{}, keyName string, prefix ...string) (bool, error) {
+	return globalEcp.GetBool(config, keyName, prefix...)
 }
 
 // GetInt64 returns int64
-func GetInt64(config interface{}, keyName string) (int64, error) {
-	return globalEcp.GetInt64(config, keyName)
+func GetInt64(config interface{}, keyName string, prefix ...string) (int64, error) {
+	return globalEcp.GetInt64(config, keyName, prefix...)
 }
 
 // GetString returns string
-func GetString(config interface{}, keyName string) (string, error) {
-	return globalEcp.GetString(config, keyName)
+func GetString(config interface{}, keyName string, prefix ...string) (string, error) {
+	return globalEcp.GetString(config, keyName, prefix...)
 }
 
 // GetFloat64 returns float64
-func GetFloat64(config interface{}, keyName string) (float64, error) {
-	return globalEcp.GetFloat64(config, keyName)
+func GetFloat64(config interface{}, keyName string, prefix ...string) (float64, error) {
+	return globalEcp.GetFloat64(config, keyName, prefix...)
 }

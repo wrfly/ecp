@@ -124,6 +124,9 @@ func TestList(t *testing.T) {
 	})
 
 	t.Run("with get key", func(t *testing.T) {
+		// reset get key function
+		defer func() { globalEcp.BuildKey = buildKeyFromEnv }()
+
 		globalEcp.BuildKey = func(parentName, structName string, tag reflect.StructTag) (key string) {
 			return strings.ToLower(parentName) + "." + strings.ToLower(structName)
 		}
@@ -131,9 +134,6 @@ func TestList(t *testing.T) {
 		for _, key := range list[18:27] {
 			fmt.Printf("%s\n", key)
 		}
-
-		// reset get key function
-		globalEcp.BuildKey = buildKeyFromEnv
 	})
 }
 
@@ -266,8 +266,11 @@ func TestGetKeyLookupValue(t *testing.T) {
 		}
 		return structName
 	}
+	// both hooks have to be restored, leaving the lookup mock behind
+	// makes every test running after this one read from it
 	defer func() {
 		globalEcp.BuildKey = buildKeyFromEnv
+		globalEcp.LookupValue = lookupValueFromEnv
 	}()
 
 	globalEcp.LookupValue = func(key string) (value string, exist bool) {

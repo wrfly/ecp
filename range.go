@@ -8,6 +8,10 @@ import (
 	"time"
 )
 
+// the expansion of parseScientific is only ever fed to ParseInt/ParseUint,
+// so anything beyond 20 digits is out of range for every Go integer type
+const maxExponent = 20
+
 func toValue(config interface{}) reflect.Value {
 	value, ok := config.(reflect.Value)
 	if !ok {
@@ -18,6 +22,19 @@ func toValue(config interface{}) reflect.Value {
 		value = value.Elem()
 	}
 	return value
+}
+
+// isSection reports whether a field is a nested config section, that is a
+// struct or a pointer to a struct. Sections are walked into even when no
+// value of their own is available.
+func isSection(field reflect.Value) bool {
+	switch field.Kind() {
+	case reflect.Struct:
+		return true
+	case reflect.Ptr:
+		return field.Type().Elem().Kind() == reflect.Struct
+	}
+	return false
 }
 
 type getAllOpt struct {
@@ -31,11 +48,11 @@ type getAllResult struct {
 	value  reflect.Value
 	tag    reflect.StructTag
 	parent string // struct name
-	key    string // key name
+	key    string // key name, empty means "ignore this field"
 	defVal string // default value
 }
 
-func (e *ecp) getAll(opts getAllOpt) getAllResult {
+func (e *ECP) getAll(opts getAllOpt) getAllResult {
 	field := opts.typ.Field(opts.index)
 
 	r := getAllResult{
@@ -56,6 +73,12 @@ func (e *ecp) getAll(opts getAllOpt) getAllResult {
 		}
 	}
 
+	// a "-" tag means "ignore this field", the same way encoding/json
+	// reads it; leaving the key empty makes both Parse and List skip it
+	if r.parent == "-" || field.Tag.Get("env") == "-" {
+		return r
+	}
+
 	r.key = e.BuildKey(opts.parent, r.parent, r.tag)
 
 	return r
@@ -67,9 +90,13 @@ type roOption struct {
 	setDef bool   // set default value
 	prefix string // prefix, usually the parent struct name
 	find   string // lookup some key
+	// struct types currently being walked, so that a self referencing
+	// type (type Node struct{ Next *Node }) stops instead of recursing
+	// until the stack blows up
+	visiting map[reflect.Type]bool
 }
 
-func (e *ecp) rangeOver(opts roOption) (reflect.Value, error) {
+func (e *ECP) rangeOver(opts roOption) (reflect.Value, error) {
 
 	rValue := toValue(opts.target)
 	if !rValue.IsValid() || rValue.Kind() != reflect.Struct {
@@ -77,7 +104,17 @@ func (e *ecp) rangeOver(opts roOption) (reflect.Value, error) {
 	}
 	rType := rValue.Type()
 
+	if opts.visiting == nil {
+		opts.visiting = make(map[reflect.Type]bool, 1)
+	}
+	opts.visiting[rType] = true
+	defer delete(opts.visiting, rType)
+
 	for index := 0; index < rValue.NumField(); index++ {
+		if !rType.Field(index).IsExported() {
+			continue
+		}
+
 		info := e.getAll(getAllOpt{rType, rValue, index, opts.prefix})
 		field := info.value
 		structName := info.parent
@@ -89,12 +126,14 @@ func (e *ecp) rangeOver(opts roOption) (reflect.Value, error) {
 			continue
 		}
 
+		section := isSection(field)
+
 		if opts.find != "" {
 			if opts.find == keyName {
 				return field, nil
 			}
 			// skip this field
-			if field.Kind() != reflect.Struct {
+			if !section {
 				continue
 			}
 		}
@@ -105,115 +144,80 @@ func (e *ecp) rangeOver(opts roOption) (reflect.Value, error) {
 		}
 
 		if !field.CanAddr() || !field.CanSet() {
-			continue
+			// a read-only config can still be searched, just not filled
+			if opts.find == "" || !section {
+				continue
+			}
 		}
 
 		kind := field.Kind()
-		if v == "" && kind != reflect.Struct {
+		if v == "" && !section {
 			continue
 		}
 
 		// set value via self-defined function
-		if e.Advance.SetValue != nil && e.Advance.SetValue(info.tag, field, v) {
+		if opts.find == "" && e.Advance.SetValue != nil &&
+			e.Advance.SetValue(info.tag, field, v) {
 			continue
 		}
 
 		switch kind {
-		case reflect.String:
-			if field.String() != "" && !exist {
-				continue
-			}
-			field.SetString(v)
-
-		case reflect.Float32, reflect.Float64:
-			if field.Float() != 0 && !exist {
-				continue
-			}
-			parsed, err := strconv.ParseFloat(v, field.Type().Bits())
+		case reflect.Struct:
+			prefix := e.BuildKey(opts.prefix, structName, info.tag)
+			found, err := e.rangeOver(roOption{
+				target:   field,
+				setDef:   opts.setDef,
+				prefix:   prefix,
+				find:     opts.find,
+				visiting: opts.visiting,
+			})
 			if err != nil {
-				return field, fmt.Errorf("convert %s error: %s", keyName, err)
+				return reflect.Value{}, err
 			}
-			field.SetFloat(parsed)
+			if opts.find != "" && found.IsValid() {
+				return found, nil
+			}
 
-		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-			if field.Int() != 0 && !exist {
-				continue
-			}
-			// only time.Duration (an int64 based type) fields accept
-			// duration syntax like "10s" or "1d"; parsing a plain int
-			// field that way would silently turn "10s" into 1e10
-			if field.Type() == reflect.TypeOf(time.Duration(0)) {
-				d, err := parseDuration(v)
+		case reflect.Ptr:
+			if section {
+				found, err := e.rangeOverPointer(field, structName, info.tag, opts)
 				if err != nil {
-					return field, fmt.Errorf("convert %s error: %s", keyName, err)
+					return reflect.Value{}, err
 				}
-				field.SetInt(int64(d))
+				if opts.find != "" && found.IsValid() {
+					return found, nil
+				}
 				continue
 			}
-			v, err := parseScientific(v)
-			if err != nil {
-				return field, fmt.Errorf("convert %s error: %s", keyName, err)
-			}
-			// parse with the field's bit size so an out-of-range value
-			// errors out instead of being silently truncated
-			parsed, err := strconv.ParseInt(v, 10, field.Type().Bits())
-			if err != nil {
-				return field, fmt.Errorf("convert %s error: %s", keyName, err)
-			}
-			field.SetInt(parsed)
-
-		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-			if field.Uint() != 0 && !exist {
+			// only set the default value to a nil pointer, but still
+			// allow an existing environment value to overwrite a set one
+			if !field.IsNil() && !exist {
 				continue
 			}
-			v, err := parseScientific(v)
-			if err != nil {
-				return field, fmt.Errorf("convert %s error: %s", keyName, err)
+			if err := e.setPointer(field, v); err != nil {
+				return field, fmt.Errorf("convert %s error: %w", keyName, err)
 			}
-			parsed, err := strconv.ParseUint(v, 10, field.Type().Bits())
-			if err != nil {
-				return field, fmt.Errorf("convert %s error: %s", keyName, err)
-			}
-			field.SetUint(parsed)
-
-		case reflect.Bool:
-			parsed, err := strconv.ParseBool(strings.ToLower(v))
-			if err != nil {
-				return field, fmt.Errorf("convert %s error: %s", keyName, err)
-			}
-			field.SetBool(parsed)
 
 		case reflect.Slice:
 			if !field.IsNil() && !exist {
 				continue
 			}
 			if err := e.parseSlice(v, field); err != nil {
-				return field, fmt.Errorf("convert %s error: %s", keyName, err)
+				return field, fmt.Errorf("convert %s error: %w", keyName, err)
 			}
 
-		case reflect.Struct:
-			prefix := e.BuildKey(opts.prefix, structName, info.tag)
-			v, err := e.rangeOver(roOption{field, opts.setDef, prefix, opts.find})
-			if err != nil {
-				return reflect.Value{}, err
-			}
-			if opts.find != "" && v.IsValid() {
-				return v, nil
-			}
-
-		case reflect.Ptr:
-			// only set the default value to a nil pointer, but still
-			// allow an existing environment value to overwrite a set one
-			if !field.IsNil() && !exist {
+		default:
+			// a value already set by the caller wins over the default,
+			// but never over an environment value
+			if !exist && !field.IsZero() {
 				continue
 			}
-			// get pointer real kind
-			value, err := e.parsePointer(field.Type().Elem(), v)
+			value, err := expandNumber(field.Type(), v)
 			if err != nil {
-				return field, fmt.Errorf("convert %s error: %s", keyName, err)
+				return field, fmt.Errorf("convert %s error: %w", keyName, err)
 			}
-			if value != nil {
-				field.Set(reflect.ValueOf(value))
+			if err := setValue(field, value); err != nil {
+				return field, fmt.Errorf("convert %s error: %w", keyName, err)
 			}
 		}
 
@@ -221,6 +225,47 @@ func (e *ecp) rangeOver(opts roOption) (reflect.Value, error) {
 	return reflect.Value{}, nil
 }
 
+// rangeOverPointer walks into a pointer to a struct, that is an optional
+// config section. A nil section is filled through a temporary value and
+// only allocated when something was actually set, so that an untouched
+// optional section stays nil.
+func (e *ECP) rangeOverPointer(field reflect.Value, structName string,
+	tag reflect.StructTag, opts roOption) (reflect.Value, error) {
+
+	elemType := field.Type().Elem()
+	if opts.visiting[elemType] {
+		// cyclic type, stop here
+		return reflect.Value{}, nil
+	}
+
+	target := field
+	if field.IsNil() {
+		if opts.find != "" || !field.CanSet() {
+			// nothing to read from, and nothing to fill
+			return reflect.Value{}, nil
+		}
+		target = reflect.New(elemType)
+	}
+
+	found, err := e.rangeOver(roOption{
+		target:   target.Elem(),
+		setDef:   opts.setDef,
+		prefix:   e.BuildKey(opts.prefix, structName, tag),
+		find:     opts.find,
+		visiting: opts.visiting,
+	})
+	if err != nil {
+		return reflect.Value{}, err
+	}
+
+	if field.IsNil() && !target.Elem().IsZero() {
+		field.Set(target)
+	}
+
+	return found, nil
+}
+
+// parseScientific rewrites "1e3" and "1,000" into a plain integer literal
 func parseScientific(v string) (string, error) {
 	v = strings.ReplaceAll(v, ",", "")
 
@@ -239,15 +284,29 @@ func parseScientific(v string) (string, error) {
 		return "", err
 	}
 	// a negative exponent would be silently ignored by the expansion
-	// loop below (e.g. "1e-3" -> "1"), which is worse than an error
+	// below (e.g. "1e-3" -> "1"), which is worse than an error
 	if n < 0 {
 		return "", fmt.Errorf("bad number %s", v)
 	}
-	result := v[:index]
-	for i := 0; i < n; i++ {
-		result += "0"
+	// without an upper bound, "1e1000000" would spend minutes building a
+	// one megabyte string that cannot fit in any integer type anyway
+	if n > maxExponent {
+		return "", fmt.Errorf("number %s out of range", v)
 	}
-	return result, nil
+
+	mantissa := v[:index]
+	// shift the decimal point instead of blindly appending zeros, so that
+	// "1.5e3" becomes 1500 instead of the unparsable "1.5000"
+	if dot := strings.IndexByte(mantissa, '.'); dot != -1 {
+		decimals := len(mantissa) - dot - 1
+		if decimals > n {
+			return "", fmt.Errorf("number %s is not an integer", v)
+		}
+		mantissa = mantissa[:dot] + mantissa[dot+1:]
+		n -= decimals
+	}
+
+	return mantissa + strings.Repeat("0", n), nil
 }
 
 // parseDuration wrapper func of time.ParseDuration to support `Xd` = `X*24h`
@@ -259,7 +318,11 @@ func parseDuration(v string) (time.Duration, error) {
 		if err != nil {
 			return 0, err
 		}
-		v = fmt.Sprintf("%dh", dayN*24)
+		hours := int64(dayN) * 24
+		if dayN != 0 && hours/int64(dayN) != 24 {
+			return 0, fmt.Errorf("duration %s out of range", v)
+		}
+		v = fmt.Sprintf("%dh", hours)
 	}
 	d, err := time.ParseDuration(v)
 	if err != nil {
