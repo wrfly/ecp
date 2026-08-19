@@ -3,17 +3,23 @@ package ecp
 import (
 	"fmt"
 	"reflect"
-	"strconv"
 	"strings"
-	"time"
 )
 
-var duration []time.Duration
-var durationType = reflect.TypeOf(duration)
+// split cuts a value into slice elements. With the default whitespace
+// separator, repeated separators are collapsed, so "a  b" yields two
+// elements instead of three (one of them empty and unparsable).
+func (e *ECP) split(v string) []string {
+	if strings.TrimSpace(e.Advance.SplitChar) == "" {
+		return strings.Fields(v)
+	}
+	return strings.Split(v, e.Advance.SplitChar)
+}
 
-// parseSlice support slice of string, int, int8, int16, int32, int64
-// float32, float64, uint, uint8, uint16, uint32, uint64, bool and time.Duration
-func (e *ecp) parseSlice(v string, field reflect.Value) error {
+// parseSlice supports slices of string, bool, int, int8, int16, int32,
+// int64, uint, uint8, uint16, uint32, uint64, float32, float64 and
+// time.Duration, including named types built on top of them.
+func (e *ECP) parseSlice(v string, field reflect.Value) error {
 	if v == "" {
 		return nil
 	}
@@ -27,265 +33,46 @@ func (e *ecp) parseSlice(v string, field reflect.Value) error {
 
 	// either space nor commas is perfect, but I think space is better
 	// since it's more natural: fmt.Println([]int{1, 2, 3}) = [1 2 3]
-	stringSlice := strings.Split(v, e.Advance.SplitChar) // split by space
+	parts := e.split(v)
 
-	field.Set(reflect.MakeSlice(field.Type(), len(stringSlice), cap(stringSlice)))
-
-	kind := field.Type().Elem().Kind()
-
-	switch kind {
-	case reflect.String:
-		field.Set(reflect.ValueOf(stringSlice))
-
-	case reflect.Int:
-		slice := []int{}
-		for _, s := range stringSlice {
-			i, err := strconv.ParseInt(s, 10, 64)
-			if err != nil {
-				return err
-			}
-			slice = append(slice, int(i))
+	// build the slice through the field's own type so that a named
+	// element type ([]Level) stays assignable
+	slice := reflect.MakeSlice(field.Type(), len(parts), len(parts))
+	for i, s := range parts {
+		if err := setValue(slice.Index(i), s); err != nil {
+			return err
 		}
-		field.Set(reflect.ValueOf(slice))
-
-	case reflect.Int8:
-		slice := []int8{}
-		for _, s := range stringSlice {
-			i, err := strconv.ParseInt(s, 10, 8)
-			if err != nil {
-				return err
-			}
-			slice = append(slice, int8(i))
-		}
-		field.Set(reflect.ValueOf(slice))
-
-	case reflect.Int16:
-		slice := []int16{}
-		for _, s := range stringSlice {
-			i, err := strconv.ParseInt(s, 10, 16)
-			if err != nil {
-				return err
-			}
-			slice = append(slice, int16(i))
-		}
-		field.Set(reflect.ValueOf(slice))
-
-	case reflect.Int32:
-		slice := []int32{}
-		for _, s := range stringSlice {
-			i, err := strconv.ParseInt(s, 10, 32)
-			if err != nil {
-				return err
-			}
-			slice = append(slice, int32(i))
-		}
-		field.Set(reflect.ValueOf(slice))
-
-	case reflect.Int64:
-		if field.Type() == durationType {
-			timeSlice := make([]time.Duration, 0, len(stringSlice))
-			for _, s := range stringSlice {
-				d, err := parseDuration(s)
-				if err != nil {
-					return err
-				}
-				timeSlice = append(timeSlice, d)
-			}
-			field.Set(reflect.ValueOf(timeSlice))
-		} else {
-			slice := []int64{}
-			for _, s := range stringSlice {
-				i, err := strconv.ParseInt(s, 10, 64)
-				if err != nil {
-					return err
-				}
-				slice = append(slice, i)
-			}
-			field.Set(reflect.ValueOf(slice))
-		}
-
-	case reflect.Float32:
-		slice := []float32{}
-		for _, s := range stringSlice {
-			i, err := strconv.ParseFloat(s, 32)
-			if err != nil {
-				return err
-			}
-			slice = append(slice, float32(i))
-		}
-		field.Set(reflect.ValueOf(slice))
-
-	case reflect.Float64:
-		slice := []float64{}
-		for _, s := range stringSlice {
-			i, err := strconv.ParseFloat(s, 64)
-			if err != nil {
-				return err
-			}
-			slice = append(slice, float64(i))
-		}
-		field.Set(reflect.ValueOf(slice))
-
-	case reflect.Uint:
-		slice := []uint{}
-		for _, s := range stringSlice {
-			i, err := strconv.ParseUint(s, 10, 64)
-			if err != nil {
-				return err
-			}
-			slice = append(slice, uint(i))
-		}
-		field.Set(reflect.ValueOf(slice))
-
-	case reflect.Uint8:
-		slice := []uint8{}
-		for _, s := range stringSlice {
-			i, err := strconv.ParseUint(s, 10, 8)
-			if err != nil {
-				return err
-			}
-			slice = append(slice, uint8(i))
-		}
-		field.Set(reflect.ValueOf(slice))
-
-	case reflect.Uint16:
-		slice := []uint16{}
-		for _, s := range stringSlice {
-			i, err := strconv.ParseUint(s, 10, 16)
-			if err != nil {
-				return err
-			}
-			slice = append(slice, uint16(i))
-		}
-		field.Set(reflect.ValueOf(slice))
-
-	case reflect.Uint32:
-		slice := []uint32{}
-		for _, s := range stringSlice {
-			i, err := strconv.ParseUint(s, 10, 32)
-			if err != nil {
-				return err
-			}
-			slice = append(slice, uint32(i))
-		}
-		field.Set(reflect.ValueOf(slice))
-
-	case reflect.Uint64:
-		slice := []uint64{}
-		for _, s := range stringSlice {
-			i, err := strconv.ParseUint(s, 10, 64)
-			if err != nil {
-				return err
-			}
-			slice = append(slice, i)
-		}
-		field.Set(reflect.ValueOf(slice))
-
-	case reflect.Bool:
-		slice := []bool{}
-		for _, s := range stringSlice {
-			i, err := strconv.ParseBool(strings.ToLower(s))
-			if err != nil {
-				return err
-			}
-			slice = append(slice, i)
-		}
-		field.Set(reflect.ValueOf(slice))
-
-	default:
-		return fmt.Errorf("unsupported slice kind %s", kind)
 	}
+	field.Set(slice)
 
 	return nil
 }
 
-func (e *ecp) parsePointer(typ reflect.Type, value string) (interface{}, error) {
-	var rValue interface{}
-	switch typ.Kind() {
-	case reflect.String:
-		rValue = &value
+// setPointer fills a pointer field, allocating the pointed-to value.
+//
+// The value is built with reflect.New from the field's own element type,
+// which keeps named pointer types (*time.Duration, *Level, ...)
+// assignable and lets *time.Duration accept the same "10s" syntax as
+// time.Duration.
+func (e *ECP) setPointer(field reflect.Value, v string) error {
+	elemType := field.Type().Elem()
+	pointer := reflect.New(elemType)
 
-	case reflect.Int, reflect.Int8, reflect.Int16,
-		reflect.Int32, reflect.Int64:
-		// parse with the pointer's bit size so an out-of-range value
-		// errors out instead of being silently truncated
-		vInt, err := strconv.ParseInt(value, 10, typ.Bits())
-		if err != nil {
-			return nil, err
-		}
-		switch typ.Kind() {
-		case reflect.Int:
-			parsed := int(vInt)
-			rValue = &parsed
-		case reflect.Int8:
-			parsed := int8(vInt)
-			rValue = &parsed
-		case reflect.Int16:
-			parsed := int16(vInt)
-			rValue = &parsed
-		case reflect.Int32:
-			parsed := int32(vInt)
-			rValue = &parsed
-		case reflect.Int64:
-			rValue = &vInt
-		}
-
-	case reflect.Uint, reflect.Uint8, reflect.Uint16,
-		reflect.Uint32, reflect.Uint64:
-		v, err := strconv.ParseUint(value, 10, typ.Bits())
-		if err != nil {
-			return nil, err
-		}
-		switch typ.Kind() {
-		case reflect.Uint:
-			parsed := uint(v)
-			rValue = &parsed
-		case reflect.Uint8:
-			parsed := uint8(v)
-			rValue = &parsed
-		case reflect.Uint16:
-			parsed := uint16(v)
-			rValue = &parsed
-		case reflect.Uint32:
-			parsed := uint32(v)
-			rValue = &parsed
-		case reflect.Uint64:
-			rValue = &v
-		}
-
-	case reflect.Bool:
-		if b, err := strconv.ParseBool(strings.ToLower(value)); err == nil {
-			rValue = &b
-		} else {
-			return nil, err
-		}
-
-	case reflect.Float32:
-		v, err := strconv.ParseFloat(value, 32)
-		if err != nil {
-			return nil, err
-		}
-		x := float32(v)
-		rValue = &x
-
-	case reflect.Float64:
-		v, err := strconv.ParseFloat(value, 64)
-		if err != nil {
-			return nil, err
-		}
-		rValue = &v
-
-	case reflect.Slice:
-		newValue := reflect.New(typ)
+	if elemType.Kind() == reflect.Slice {
 		// parseSlice needs the slice value itself, not the pointer to it
-		if err := e.parseSlice(value, newValue.Elem()); err != nil {
-			return rValue, err
+		if err := e.parseSlice(v, pointer.Elem()); err != nil {
+			return err
 		}
-		return newValue.Interface(), nil
-
-	default:
-		return rValue, fmt.Errorf("unsupported pointer kind %s", typ.Kind())
+	} else {
+		v, err := expandNumber(elemType, v)
+		if err != nil {
+			return err
+		}
+		if err := setValue(pointer.Elem(), v); err != nil {
+			return err
+		}
 	}
 
-	return rValue, nil
+	field.Set(pointer)
+	return nil
 }

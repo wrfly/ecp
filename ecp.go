@@ -5,88 +5,137 @@ package ecp
 import (
 	"fmt"
 	"reflect"
+	"strconv"
 	"strings"
 )
 
-type ecp struct {
-	BuildKey    BuildKeyFunc
+// ECP is an environment config parser. Create one with New when the
+// default behaviour has to be changed, or use the package level Parse,
+// List and Get functions to work with the default one.
+type ECP struct {
+	// BuildKey builds the environment key of a field
+	BuildKey BuildKeyFunc
+	// LookupValue returns the value of a key and whether it exists
 	LookupValue LookupValueFunc
 
-	Advance advanceConfig
+	Advance AdvanceConfig
 }
 
-type advanceConfig struct {
+// AdvanceConfig holds the optional knobs of an ECP
+type AdvanceConfig struct {
 	SplitChar string // split slice
 	SetValue  SetValueFunc
 }
 
-var globalEcp = &ecp{
-	BuildKey:    buildKeyFromEnv,
-	LookupValue: lookupValueFromEnv,
-	Advance: advanceConfig{
-		SplitChar: space,
-	},
-}
+var globalEcp = New()
 
 // New ecp object
-func New() *ecp {
-	return &ecp{
+func New() *ECP {
+	return &ECP{
 		BuildKey:    buildKeyFromEnv,
 		LookupValue: lookupValueFromEnv,
-		Advance: advanceConfig{
+		Advance: AdvanceConfig{
 			SplitChar: space,
 		},
 	}
 }
 
-func (e *ecp) Parse(config interface{}, prefix ...string) error {
+// Parse the configuration through environments starting with the
+// prefix (or not), see the package level Parse for the details
+func (e *ECP) Parse(config interface{}, prefix ...string) error {
 	if len(prefix) == 0 {
 		prefix = []string{""}
 	}
-	_, err := e.rangeOver(roOption{config, true, prefix[0], ""})
+
+	// catch the classic Parse(config) instead of Parse(&config): without
+	// a pointer every field is read-only, so Parse would report success
+	// after filling in exactly nothing
+	if value := toValue(config); value.IsValid() &&
+		value.Kind() == reflect.Struct && !value.CanSet() {
+		return fmt.Errorf("config must be a pointer to a struct, got %s", value.Type())
+	}
+
+	_, err := e.rangeOver(roOption{target: config, setDef: true, prefix: prefix[0]})
 	return err
 }
 
-func (e *ecp) List(config interface{}, prefix ...string) []string {
-	list := []string{}
-
+// List all the config environments, see the package level List for
+// the details
+func (e *ECP) List(config interface{}, prefix ...string) []string {
 	if len(prefix) == 0 {
 		prefix = []string{""}
 	}
-	parentName := prefix[0]
+	return e.list(config, prefix[0], make(map[reflect.Type]bool, 1))
+}
+
+func (e *ECP) list(config interface{}, parentName string,
+	visiting map[reflect.Type]bool) []string {
+
+	list := []string{}
 
 	configValue := toValue(config)
 	if !configValue.IsValid() || configValue.Kind() != reflect.Struct {
 		return list
 	}
 	configType := configValue.Type()
+
+	// stop a self referencing type from recursing forever
+	if visiting[configType] {
+		return list
+	}
+	visiting[configType] = true
+	defer delete(visiting, configType)
+
 	for index := 0; index < configValue.NumField(); index++ {
 		if !configType.Field(index).IsExported() {
 			continue
 		}
 		all := e.getAll(getAllOpt{configType, configValue, index, parentName})
-		if all.parent == "-" || all.key == "" {
+		if all.key == "" {
 			continue
 		}
-		switch all.value.Kind() {
-		case reflect.Struct:
+		switch {
+		case all.value.Kind() == reflect.Struct:
 			prefix := e.BuildKey(parentName, all.parent, all.tag)
-			list = append(list, e.List(all.value, prefix)...)
-		default:
-			if strings.Contains(all.defVal, " ") {
-				all.defVal = fmt.Sprintf(`"%s"`, all.defVal)
+			list = append(list, e.list(all.value, prefix, visiting)...)
+
+		case isSection(all.value):
+			// an optional section: list the keys of the pointed-to
+			// struct, a nil pointer still has all of them
+			prefix := e.BuildKey(parentName, all.parent, all.tag)
+			section := all.value
+			if section.IsNil() {
+				section = reflect.New(all.value.Type().Elem())
 			}
-			list = append(list, fmt.Sprintf("%s=%s", all.key, all.defVal))
+			list = append(list, e.list(section.Elem(), prefix, visiting)...)
+
+		case !canSetKind(all.value.Kind()):
+			// maps, arrays, channels... cannot be filled from a string,
+			// so listing a key for them would be misleading
+			continue
+
+		default:
+			list = append(list, fmt.Sprintf("%s=%s", all.key, quoteValue(all.defVal)))
 		}
 	}
 
 	return list
 }
 
-// List function will also fill up the value of the environment key
-// it the "default" tag has value
+// quoteValue quotes a default value that would not survive a round trip
+// through a shell or an env file unquoted
+func quoteValue(v string) string {
+	if strings.ContainsAny(v, " \t\r\n\"'\\`$") {
+		return strconv.Quote(v)
+	}
+	return v
+}
 
-// List all the config environments
+// List all the config environments.
+//
+// The value of each key is the one from the "default" tag, empty if the
+// field has no default. Fields tagged with `env:"-"`, `yaml:"-"` or
+// `json:"-"` are skipped.
 func List(config interface{}, prefix ...string) []string {
 	return globalEcp.List(config, prefix...)
 }
@@ -109,9 +158,14 @@ func List(config interface{}, prefix ...string) []string {
 //	type config struct {
 //	    One   string   `default:"1"`
 //	    Two   int      `default:"2"`
-//	    Three []string `default:"1,2,3"`
+//	    Three []string `default:"1 2 3"`
 //	}
 //	c := &config{}
+//
+// Slice values are separated by Advance.SplitChar, a space by default.
+//
+// config must be a pointer to a struct, otherwise Parse returns an error
+// instead of silently doing nothing.
 func Parse(config interface{}, prefix ...string) error {
 	return globalEcp.Parse(config, prefix...)
 }
