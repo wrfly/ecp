@@ -450,3 +450,93 @@ func TestSameTypeSections(t *testing.T) {
 		}
 	}
 }
+
+// a separator the caller chose is taken literally; only the default one
+// collapses repeats. A "is the separator whitespace" test used to route
+// a deliberate tab through strings.Fields and split on spaces too.
+func TestCustomWhitespaceSplitChar(t *testing.T) {
+	for _, tc := range []struct {
+		sep  string
+		in   string
+		want []string
+	}{
+		{"\t", "a b\tc d", []string{"a b", "c d"}},
+		{"\n", "a b\nc d", []string{"a b", "c d"}},
+		{",", "a b,c d", []string{"a b", "c d"}},
+		{" ", " a  b ", []string{"a", "b"}}, // the default still collapses
+		{"", "a  b", []string{"a", "b"}},    // unset falls back to the default
+	} {
+		e := New()
+		e.Advance.SplitChar = tc.sep
+		c := &struct {
+			S []string `env:"SPLIT_S"`
+		}{}
+		os.Setenv("SPLIT_S", tc.in)
+		err := e.Parse(c)
+		os.Unsetenv("SPLIT_S")
+		if err != nil {
+			t.Errorf("sep %q: %v", tc.sep, err)
+			continue
+		}
+		if strings.Join(c.S, "|") != strings.Join(tc.want, "|") {
+			t.Errorf("sep %q: got %q, want %q", tc.sep, c.S, tc.want)
+		}
+	}
+}
+
+// a section is allocated when one of its fields was assigned, even if
+// every value in it is zero. Testing the result for zero instead used to
+// leave the section nil for an explicit PORT=0.
+func TestPointerSectionExplicitZero(t *testing.T) {
+	type sub struct {
+		Port int
+		Name string
+	}
+	type conf struct {
+		P     *sub `yaml:"p"`
+		Empty *sub `yaml:"empty"`
+	}
+
+	withEnv(t, "P_PORT", "0")
+	c := &conf{}
+	if err := Parse(c); err != nil {
+		t.Fatal(err)
+	}
+	if c.P == nil {
+		t.Error("a section with an explicit value must be allocated")
+	} else if c.P.Port != 0 {
+		t.Errorf("port: %d", c.P.Port)
+	}
+	// and a section nothing was said about stays nil
+	if c.Empty != nil {
+		t.Errorf("untouched section should stay nil, got %+v", c.Empty)
+	}
+
+	// every key List advertises has to be readable back after Parse
+	for _, item := range List(conf{}) {
+		key := strings.Split(item, "=")[0]
+		if _, err := Get(c, key); err != nil && strings.HasPrefix(key, "P_") {
+			t.Errorf("listed key %s is not gettable: %v", key, err)
+		}
+	}
+}
+
+// a value that merely contains an "e" is reported as a whole, it used to
+// be blamed on the fragment after the e
+func TestNonNumericValueErrorMessage(t *testing.T) {
+	for _, in := range []string{"not-a-number", "hello"} {
+		c := &struct {
+			N int `env:"MSG_N"`
+		}{}
+		os.Setenv("MSG_N", in)
+		err := Parse(c)
+		os.Unsetenv("MSG_N")
+		if err == nil {
+			t.Errorf("%q should not parse", in)
+			continue
+		}
+		if !strings.Contains(err.Error(), in) {
+			t.Errorf("error for %q does not mention it: %v", in, err)
+		}
+	}
+}

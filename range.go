@@ -94,6 +94,19 @@ type roOption struct {
 	// type (type Node struct{ Next *Node }) stops instead of recursing
 	// until the stack blows up
 	visiting map[reflect.Type]bool
+	// filled reports whether any field was actually assigned. An
+	// optional section needs to know that, since a section filled
+	// entirely with zero values (PORT=0) is still a section that was
+	// asked for, and testing the result for zero cannot tell the two
+	// apart.
+	filled *bool
+}
+
+// markFilled records that a field was assigned during this walk
+func (o roOption) markFilled() {
+	if o.filled != nil {
+		*o.filled = true
+	}
 }
 
 func (e *ECP) rangeOver(opts roOption) (reflect.Value, error) {
@@ -158,6 +171,7 @@ func (e *ECP) rangeOver(opts roOption) (reflect.Value, error) {
 		// set value via self-defined function
 		if opts.find == "" && e.Advance.SetValue != nil &&
 			e.Advance.SetValue(info.tag, field, v) {
+			opts.markFilled()
 			continue
 		}
 
@@ -170,6 +184,7 @@ func (e *ECP) rangeOver(opts roOption) (reflect.Value, error) {
 				prefix:   prefix,
 				find:     opts.find,
 				visiting: opts.visiting,
+				filled:   opts.filled,
 			})
 			if err != nil {
 				return reflect.Value{}, err
@@ -197,6 +212,7 @@ func (e *ECP) rangeOver(opts roOption) (reflect.Value, error) {
 			if err := e.setPointer(field, v); err != nil {
 				return field, fmt.Errorf("convert %s error: %w", keyName, err)
 			}
+			opts.markFilled()
 
 		case reflect.Slice:
 			if !field.IsNil() && !exist {
@@ -205,6 +221,7 @@ func (e *ECP) rangeOver(opts roOption) (reflect.Value, error) {
 			if err := e.parseSlice(v, field); err != nil {
 				return field, fmt.Errorf("convert %s error: %w", keyName, err)
 			}
+			opts.markFilled()
 
 		default:
 			// a value already set by the caller wins over the default,
@@ -219,6 +236,7 @@ func (e *ECP) rangeOver(opts roOption) (reflect.Value, error) {
 			if err := setValue(field, value); err != nil {
 				return field, fmt.Errorf("convert %s error: %w", keyName, err)
 			}
+			opts.markFilled()
 		}
 
 	}
@@ -227,8 +245,9 @@ func (e *ECP) rangeOver(opts roOption) (reflect.Value, error) {
 
 // rangeOverPointer walks into a pointer to a struct, that is an optional
 // config section. A nil section is filled through a temporary value and
-// only allocated when something was actually set, so that an untouched
-// optional section stays nil.
+// only allocated when one of its fields was actually assigned, so that an
+// untouched optional section stays nil while a section explicitly asked
+// for is allocated even when every value in it is zero.
 func (e *ECP) rangeOverPointer(field reflect.Value, structName string,
 	tag reflect.StructTag, opts roOption) (reflect.Value, error) {
 
@@ -247,20 +266,27 @@ func (e *ECP) rangeOverPointer(field reflect.Value, structName string,
 		target = reflect.New(elemType)
 	}
 
+	filled := false
 	found, err := e.rangeOver(roOption{
 		target:   target.Elem(),
 		setDef:   opts.setDef,
 		prefix:   e.BuildKey(opts.prefix, structName, tag),
 		find:     opts.find,
 		visiting: opts.visiting,
+		filled:   &filled,
 	})
 	if err != nil {
 		return reflect.Value{}, err
 	}
 
-	if field.IsNil() && !target.Elem().IsZero() {
+	if !filled {
+		return found, nil
+	}
+	if field.IsNil() {
 		field.Set(target)
 	}
+	// an allocated or updated section fills the struct holding it
+	opts.markFilled()
 
 	return found, nil
 }
@@ -281,7 +307,11 @@ func parseScientific(v string) (string, error) {
 	}
 	n, err := strconv.Atoi(v[index+1:])
 	if err != nil {
-		return "", err
+		// not scientific notation at all, just a value that happens to
+		// contain an "e". Handing it back unchanged lets the caller
+		// report it as a whole ("hello"), instead of blaming the
+		// fragment after the e ("llo").
+		return v, nil
 	}
 	// a negative exponent would be silently ignored by the expansion
 	// below (e.g. "1e-3" -> "1"), which is worse than an error

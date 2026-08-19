@@ -6,14 +6,32 @@ import (
 	"strings"
 )
 
-// split cuts a value into slice elements. With the default whitespace
-// separator, repeated separators are collapsed, so "a  b" yields two
-// elements instead of three (one of them empty and unparsable).
+// split cuts a value into slice elements.
+//
+// Only the default separator collapses repeats, so "a  b" yields two
+// elements instead of three (one of them empty and unparsable). Any
+// separator the caller chose is taken literally, including a tab or a
+// newline, which a "is it whitespace" test used to swallow.
 func (e *ECP) split(v string) []string {
-	if strings.TrimSpace(e.Advance.SplitChar) == "" {
-		return strings.Fields(v)
+	sep := e.Advance.SplitChar
+	if sep == "" {
+		// an empty separator would make strings.Split cut between every
+		// rune, which is never what the caller meant
+		sep = space
 	}
-	return strings.Split(v, e.Advance.SplitChar)
+
+	parts := strings.Split(v, sep)
+	if sep != space {
+		return parts
+	}
+
+	collapsed := parts[:0]
+	for _, p := range parts {
+		if p != "" {
+			collapsed = append(collapsed, p)
+		}
+	}
+	return collapsed
 }
 
 // parseSlice supports slices of string, bool, int, int8, int16, int32,

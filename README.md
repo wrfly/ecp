@@ -118,15 +118,21 @@ built on top of them. Anything else (a `map`, an array, ...) is reported as
 an error rather than silently skipped.
 
 - **slices** are separated by a space by default, change it with
-  `e := ecp.New(); e.Advance.SplitChar = ","`
+  `e := ecp.New(); e.Advance.SplitChar = ","`. The default separator
+  collapses repeats, so `a  b` is two elements; a separator you choose is
+  taken literally, empty elements and all
 - **durations** accept everything `time.ParseDuration` does, plus `Xd`
   for X days: `10s`, `5m`, `6d`
-- **integers** also accept `1e3` and `1,000` notation
+- **integers** also accept `1e3` and `1,000` notation. Slice elements do
+  not: there `1,2` is far more likely to be the wrong separator than the
+  number 12, so it is reported instead of quietly parsed
 - **pointers** (`*int`, `*time.Duration`, ...) only get their default when
   they are nil, which makes "unset" and "set to the zero value"
   distinguishable
 - **pointers to a struct** are optional sections: they are walked into like
-  a plain struct and only allocated when one of their fields is set
+  a plain struct and only allocated when one of their fields is actually
+  set, whether from the environment or from a `default` tag. A section
+  nothing was said about stays nil
 
 An environment variable set to an empty value is treated as unset, so a
 field keeps its default.
